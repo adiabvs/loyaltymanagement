@@ -128,6 +128,21 @@ export const loyaltyService = {
     }
   },
 
+  async processVisitFromPhone(brandId, phoneNumber) {
+    try {
+      const response = await apiClient.post(`/brand/scan`, { phoneNumber });
+      return {
+        success: response.success,
+        message: response.message,
+        visit: response.visit,
+        customer: response.customer,
+      };
+    } catch (error) {
+      console.warn("API call failed:", error);
+      throw error;
+    }
+  },
+
   async getBrandCampaigns(brandId) {
     try {
       const response = await apiClient.get(`/brand/campaigns`);

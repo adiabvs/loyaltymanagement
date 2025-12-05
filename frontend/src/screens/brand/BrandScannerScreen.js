@@ -46,20 +46,38 @@ export function BrandScannerScreen() {
   };
 
   const handleWebManualInput = () => {
-    // For web, use browser prompt
+    // For web, use browser prompt to ask for phone number
     if (Platform.OS === 'web') {
-      const qrData = window.prompt("Enter QR Code Data (paste the QR code JSON string here):");
-      if (qrData && qrData.trim()) {
-        handleScanned({ data: qrData.trim() });
+      const phoneNumber = window.prompt("Enter customer phone number (last 10 digits):");
+      if (phoneNumber && phoneNumber.trim()) {
+        // Process phone number instead of QR data
+        handlePhoneNumberInput(phoneNumber.trim());
       }
     } else {
-      // For mobile, Alert.prompt may not be available in all React Native versions
-      // Use a simple Alert with input field simulation
       Alert.alert(
-        "Manual QR Entry",
-        "This feature requires a text input. Please use the web version or scan with camera.",
+        "Manual Entry",
+        "Please use the camera to scan QR code, or use the web version for manual entry.",
         [{ text: "OK" }]
       );
+    }
+  };
+
+  const handlePhoneNumberInput = async (phoneNumber: string) => {
+    setScanning(false);
+    try {
+      // Call API with phone number instead of QR data
+      const result = await loyaltyService.processVisitFromPhone(user?.id, phoneNumber);
+      setLastResult({
+        success: true,
+        visits: result.customer.visits,
+      });
+      setTimeout(() => setLastResult(null), 3000);
+    } catch (e) {
+      setLastResult({
+        success: false,
+        error: e.message,
+      });
+      setTimeout(() => setLastResult(null), 5000);
     }
   };
 
@@ -95,16 +113,16 @@ export function BrandScannerScreen() {
               Web Scanner
             </Text>
             <Text style={styles.webScannerSubtext}>
-              Use one of the options below to scan QR codes
+              Enter customer phone number to credit a visit
             </Text>
             <TouchableOpacity
               style={styles.webButton}
               onPress={handleWebManualInput}
             >
-              <Text style={styles.webButtonText}>Enter QR Code Manually</Text>
+              <Text style={styles.webButtonText}>Enter Phone Number</Text>
             </TouchableOpacity>
             <Text style={styles.webHelpText}>
-              Paste the QR code JSON data in the prompt that appears
+              Enter the last 10 digits of the customer's phone number
             </Text>
           </View>
         ) : scanning ? (

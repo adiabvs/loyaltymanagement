@@ -26,11 +26,15 @@ export class CustomerController {
         issuedAt: Date.now(),
       });
 
+      // Get customer user record to check for custom stampsToReward
+      const customer = await db.users.findById(customerId);
+      const stampsToReward = (customer as any)?.stampsToReward || 5; // Default to 5 if not set
+
       res.json({
         visits: visitCount,
         points: totalPoints,
         stamps: totalStamps,
-        stampsToReward: 5, // Default, can be made configurable
+        stampsToReward,
         rewards,
         qrPayload,
       });

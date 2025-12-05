@@ -51,22 +51,18 @@ export function BrandDashboardScreen() {
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Total Visits</Text>
           <Text style={styles.metricValue}>{metrics.totalVisits || 0}</Text>
-          <Text style={styles.metricChange}>+12% this month</Text>
         </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Returning Customers</Text>
           <Text style={styles.metricValue}>{metrics.returningCustomers || 0}</Text>
-          <Text style={styles.metricChange}>+8% this month</Text>
         </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Redemptions</Text>
           <Text style={styles.metricValue}>{metrics.redemptions || 0}</Text>
-          <Text style={styles.metricChange}>Active rewards</Text>
         </View>
         <View style={styles.metricTile}>
           <Text style={styles.metricLabel}>Active Campaigns</Text>
           <Text style={styles.metricValue}>{metrics.activeCampaigns || 0}</Text>
-          <Text style={styles.metricChange}>Running now</Text>
         </View>
       </View>
 

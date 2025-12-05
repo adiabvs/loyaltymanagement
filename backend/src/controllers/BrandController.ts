@@ -68,28 +68,67 @@ export class BrandController {
   static async processQR(req: AuthRequest, res: Response): Promise<void> {
     try {
       const brandId = req.userId!;
-      const { qrData } = processQRSchema.parse(req.body);
+      const { qrData, phoneNumber } = req.body;
       const db = getDatabase();
 
-      // Parse QR payload
-      const payload = JSON.parse(qrData);
-      if (payload.type !== "visit") {
-        res.status(400).json({ error: "Invalid QR code type" });
-        return;
-      }
+      let customerId: string | null = null;
+      let customer = null;
 
-      // Check if QR is too old (e.g., > 1 hour)
-      const qrAge = Date.now() - payload.issuedAt;
-      const oneHour = 60 * 60 * 1000;
-      if (qrAge > oneHour) {
-        res.status(400).json({ error: "QR code expired. Please refresh." });
-        return;
-      }
+      // Support both QR code and phone number lookup
+      if (phoneNumber) {
+        // Lookup by phone number (last 10 digits)
+        const phoneDigits = phoneNumber.replace(/\D/g, ''); // Remove non-digits
+        const last10Digits = phoneDigits.slice(-10); // Get last 10 digits
+        
+        // Try to find customer by phone number (exact match or ending match)
+        // First try exact match
+        customer = await db.users.findByEmailOrPhone(last10Digits);
+        
+        // If not found, try finding by partial match (phone ending with these digits)
+        if (!customer) {
+          // Use database query helper to find customers
+          const { database } = await import('../database/index');
+          const allUsers = await database.query('users', [['role', '==', 'customer']], 1000);
+          customer = allUsers.find((u: any) => {
+            const userPhone = u.phoneNumber?.replace(/\D/g, '') || '';
+            return userPhone.endsWith(last10Digits) || userPhone === last10Digits;
+          }) || null;
+        }
+        
+        if (!customer || !customer.id) {
+          res.status(404).json({ error: "Customer not found with this phone number" });
+          return;
+        }
+        customerId = customer.id;
+      } else if (qrData) {
+        // Parse QR payload (original method)
+        try {
+          const payload = JSON.parse(qrData);
+          if (payload.type !== "visit") {
+            res.status(400).json({ error: "Invalid QR code type" });
+            return;
+          }
 
-      const customerId = payload.customerId;
-      const customer = await db.users.findById(customerId);
-      if (!customer) {
-        res.status(404).json({ error: "Customer not found" });
+          // Check if QR is too old (e.g., > 1 hour)
+          const qrAge = Date.now() - payload.issuedAt;
+          const oneHour = 60 * 60 * 1000;
+          if (qrAge > oneHour) {
+            res.status(400).json({ error: "QR code expired. Please refresh." });
+            return;
+          }
+
+          customerId = payload.customerId;
+          customer = await db.users.findById(customerId);
+          if (!customer) {
+            res.status(404).json({ error: "Customer not found" });
+            return;
+          }
+        } catch (parseError) {
+          res.status(400).json({ error: "Invalid QR code format" });
+          return;
+        }
+      } else {
+        res.status(400).json({ error: "Either qrData or phoneNumber is required" });
         return;
       }
 

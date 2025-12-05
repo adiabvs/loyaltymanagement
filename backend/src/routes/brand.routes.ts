@@ -11,7 +11,10 @@ router.use(authenticate);
 router.use(requireRole("brand"));
 
 const processQRSchema = z.object({
-  qrData: z.string().min(1),
+  qrData: z.string().optional(),
+  phoneNumber: z.string().optional(),
+}).refine(data => data.qrData || data.phoneNumber, {
+  message: "Either qrData or phoneNumber is required",
 });
 
 const createCampaignSchema = z.object({
