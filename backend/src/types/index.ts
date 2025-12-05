@@ -32,6 +32,7 @@ export interface Visit {
   timestamp: Date;
   pointsEarned: number;
   stampsEarned: number;
+  amountSpent?: number; // Optional: amount spent during this visit
 }
 
 export interface Reward {
@@ -58,6 +59,9 @@ export interface Campaign {
   startDate: Date;
   endDate?: Date;
   createdAt: Date;
+  qualificationType?: "visits" | "money" | "scan"; // How customer qualifies for this campaign
+  requiredVisits?: number; // Required visits if qualificationType is "visits"
+  requiredAmount?: number; // Required money spent if qualificationType is "money"
 }
 
 export interface QRPayload {

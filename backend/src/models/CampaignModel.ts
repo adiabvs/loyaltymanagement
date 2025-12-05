@@ -13,6 +13,9 @@ export class CampaignModel {
     value: number;
     startDate: Date;
     endDate?: Date;
+    qualificationType?: "visits" | "money" | "scan";
+    requiredVisits?: number;
+    requiredAmount?: number;
   }): Campaign {
     const campaign: Campaign = {
       id: uuidv4(),
@@ -25,6 +28,9 @@ export class CampaignModel {
       startDate: data.startDate,
       endDate: data.endDate,
       createdAt: new Date(),
+      qualificationType: data.qualificationType,
+      requiredVisits: data.requiredVisits,
+      requiredAmount: data.requiredAmount,
     };
 
     campaigns.set(campaign.id, campaign);

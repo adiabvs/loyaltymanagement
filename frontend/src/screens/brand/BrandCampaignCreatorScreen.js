@@ -16,6 +16,9 @@ export function BrandCampaignCreatorScreen({ onBack }) {
     value: "",
     startDate: new Date().toISOString().split('T')[0],
     endDate: "",
+    qualificationType: "scan", // visits, money, scan
+    requiredVisits: "",
+    requiredAmount: "",
   });
 
   const handleCreate = async () => {
@@ -24,9 +27,19 @@ export function BrandCampaignCreatorScreen({ onBack }) {
       return;
     }
 
+    // Validate qualification requirements
+    if (formData.qualificationType === "visits" && !formData.requiredVisits) {
+      Alert.alert("Error", "Please specify the required number of visits");
+      return;
+    }
+    if (formData.qualificationType === "money" && !formData.requiredAmount) {
+      Alert.alert("Error", "Please specify the required amount to spend");
+      return;
+    }
+
     setLoading(true);
     try {
-      const campaign = await loyaltyService.createCampaign(user?.id, {
+      const campaignData = {
         title: formData.offerName,
         description: formData.description,
         type: formData.type,
@@ -34,7 +47,18 @@ export function BrandCampaignCreatorScreen({ onBack }) {
         isActive: true,
         startDate: new Date(formData.startDate),
         endDate: formData.endDate ? new Date(formData.endDate) : undefined,
-      });
+        qualificationType: formData.qualificationType,
+      };
+
+      // Add required fields based on qualification type
+      if (formData.qualificationType === "visits" && formData.requiredVisits) {
+        campaignData.requiredVisits = parseInt(formData.requiredVisits) || 0;
+      }
+      if (formData.qualificationType === "money" && formData.requiredAmount) {
+        campaignData.requiredAmount = parseFloat(formData.requiredAmount) || 0;
+      }
+
+      const campaign = await loyaltyService.createCampaign(user?.id, campaignData);
       
       // Close the creator screen first
       onBack?.();
@@ -160,6 +184,91 @@ export function BrandCampaignCreatorScreen({ onBack }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>How to Qualify</Text>
+          <Text style={styles.hintText}>
+            Choose how customers can unlock this campaign
+          </Text>
+          <View style={styles.typeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                formData.qualificationType === "scan" && styles.typeButtonActive
+              ]}
+              onPress={() => setFormData({ ...formData, qualificationType: "scan", requiredVisits: "", requiredAmount: "" })}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                formData.qualificationType === "scan" && styles.typeButtonTextActive
+              ]}>
+                Scan QR
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                formData.qualificationType === "visits" && styles.typeButtonActive
+              ]}
+              onPress={() => setFormData({ ...formData, qualificationType: "visits", requiredAmount: "" })}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                formData.qualificationType === "visits" && styles.typeButtonTextActive
+              ]}>
+                By Visits
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                formData.qualificationType === "money" && styles.typeButtonActive
+              ]}
+              onPress={() => setFormData({ ...formData, qualificationType: "money", requiredVisits: "" })}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                formData.qualificationType === "money" && styles.typeButtonTextActive
+              ]}>
+                By Money
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {formData.qualificationType === "visits" && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Required Visits *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 5"
+              placeholderTextColor="#6B7280"
+              keyboardType="numeric"
+              value={formData.requiredVisits}
+              onChangeText={(text) => setFormData({ ...formData, requiredVisits: text })}
+            />
+            <Text style={styles.hintText}>
+              Number of visits needed to unlock this campaign
+            </Text>
+          </View>
+        )}
+
+        {formData.qualificationType === "money" && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Required Amount ($) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 100"
+              placeholderTextColor="#6B7280"
+              keyboardType="decimal-pad"
+              value={formData.requiredAmount}
+              onChangeText={(text) => setFormData({ ...formData, requiredAmount: text })}
+            />
+            <Text style={styles.hintText}>
+              Total amount customer needs to spend to unlock this campaign
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.createButton, loading && styles.createButtonDisabled]}
@@ -312,6 +421,12 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontSize: 13,
     lineHeight: 20,
+  },
+  hintText: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 8,
   },
 });
 

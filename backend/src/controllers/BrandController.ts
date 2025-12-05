@@ -136,12 +136,19 @@ export class BrandController {
       const pointsEarned = 10; // Default points per visit
       const stampsEarned = 1; // Default 1 stamp per visit
 
-      const visit = await db.visits.create({
+      const visitData: any = {
         customerId,
         brandId,
         pointsEarned,
         stampsEarned,
-      });
+      };
+
+      // Include amountSpent if provided (for money-based campaigns)
+      if (req.body.amountSpent) {
+        visitData.amountSpent = req.body.amountSpent;
+      }
+
+      const visit = await db.visits.create(visitData);
 
       // Get customer's current visits count
       const customerVisits = await db.visits.getByCustomer(customerId);
@@ -192,11 +199,20 @@ export class BrandController {
         value: data.value,
         isActive: true,
         startDate: new Date(),
+        qualificationType: data.qualificationType || "scan", // Default to "scan" if not specified
       };
 
       // Only include endDate if provided
       if (data.endDate) {
         campaignData.endDate = new Date(data.endDate);
+      }
+
+      // Include qualification requirements if specified
+      if (data.qualificationType === "visits" && data.requiredVisits) {
+        campaignData.requiredVisits = data.requiredVisits;
+      }
+      if (data.qualificationType === "money" && data.requiredAmount) {
+        campaignData.requiredAmount = data.requiredAmount;
       }
 
       const campaign = await db.campaigns.create(campaignData);

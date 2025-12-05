@@ -78,6 +78,49 @@ export function CustomerPromotionsScreen() {
               </View>
             </View>
             <Text style={styles.cardDescription}>{promotion.description}</Text>
+            
+            {/* Progress indicator for visits/money based campaigns */}
+            {promotion.progress && promotion.progress.remaining > 0 && (
+              <View style={styles.progressContainer}>
+                {promotion.progress.type === "visits" && (
+                  <View style={styles.progressBarContainer}>
+                    <View style={styles.progressBarBackground}>
+                      <View 
+                        style={[
+                          styles.progressBarFill, 
+                          { width: `${(promotion.progress.current / promotion.progress.required) * 100}%` }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      {promotion.progress.current} / {promotion.progress.required} visits • {promotion.progressText}
+                    </Text>
+                  </View>
+                )}
+                {promotion.progress.type === "money" && (
+                  <View style={styles.progressBarContainer}>
+                    <View style={styles.progressBarBackground}>
+                      <View 
+                        style={[
+                          styles.progressBarFill, 
+                          { width: `${Math.min(100, (promotion.progress.current / promotion.progress.required) * 100)}%` }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      ${promotion.progress.current.toFixed(2)} / ${promotion.progress.required.toFixed(2)} spent • {promotion.progressText}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
+            {promotion.progress && promotion.progress.remaining === 0 && (
+              <View style={styles.qualifiedBadge}>
+                <Text style={styles.qualifiedText}>✓ Qualified!</Text>
+              </View>
+            )}
+            
             <View style={styles.cardFooter}>
               <Text style={styles.cardValue}>
                 {formatCampaignValue(promotion)}
@@ -192,6 +235,43 @@ const styles = StyleSheet.create({
   cardMeta: {
     color: "#9CA3AF",
     fontSize: 12,
+  },
+  progressContainer: {
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  progressBarContainer: {
+    marginBottom: 8,
+  },
+  progressBarBackground: {
+    height: 8,
+    backgroundColor: "#1E293B",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#38BDF8",
+    borderRadius: 4,
+  },
+  progressText: {
+    color: "#38BDF8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  qualifiedBadge: {
+    backgroundColor: "#022C22",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginBottom: 12,
+  },
+  qualifiedText: {
+    color: "#10B981",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
 

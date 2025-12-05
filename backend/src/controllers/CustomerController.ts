@@ -116,10 +116,54 @@ export class CustomerController {
         campaign => visitedBrandIds.has(campaign.brandId)
       );
 
-      // Enrich campaigns with brand information
+      // Enrich campaigns with brand information and customer progress
       const promotionsWithBrands = await Promise.all(
         relevantCampaigns.map(async (campaign) => {
           const brand = await db.users.findById(campaign.brandId);
+          
+          // Calculate customer progress for this campaign
+          const brandVisits = customerVisits.filter(v => v.brandId === campaign.brandId);
+          const visitCount = brandVisits.length;
+          const totalAmountSpent = brandVisits.reduce((sum, v) => sum + ((v.amountSpent || 0)), 0);
+          
+          // Calculate progress based on qualification type
+          let progress = null;
+          let remaining = null;
+          let progressText = null;
+          
+          if (campaign.qualificationType === "visits" && campaign.requiredVisits) {
+            const visitsLeft = Math.max(0, campaign.requiredVisits - visitCount);
+            progress = {
+              current: visitCount,
+              required: campaign.requiredVisits,
+              remaining: visitsLeft,
+              type: "visits",
+            };
+            progressText = visitsLeft > 0 
+              ? `${visitsLeft} visit${visitsLeft > 1 ? 's' : ''} left`
+              : "Qualified!";
+          } else if (campaign.qualificationType === "money" && campaign.requiredAmount) {
+            const amountLeft = Math.max(0, campaign.requiredAmount - totalAmountSpent);
+            progress = {
+              current: totalAmountSpent,
+              required: campaign.requiredAmount,
+              remaining: amountLeft,
+              type: "money",
+            };
+            progressText = amountLeft > 0 
+              ? `$${amountLeft.toFixed(2)} left to spend`
+              : "Qualified!";
+          } else if (campaign.qualificationType === "scan") {
+            // Scan-based campaigns are available immediately
+            progress = {
+              current: 1,
+              required: 1,
+              remaining: 0,
+              type: "scan",
+            };
+            progressText = "Available now";
+          }
+          
           return {
             ...campaign,
             brand: brand ? {
@@ -128,6 +172,8 @@ export class CustomerController {
               businessName: brand.businessName,
               phoneNumber: brand.phoneNumber,
             } : null,
+            progress,
+            progressText,
           };
         })
       );

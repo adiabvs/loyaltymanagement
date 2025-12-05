@@ -13,6 +13,7 @@ router.use(requireRole("brand"));
 const processQRSchema = z.object({
   qrData: z.string().optional(),
   phoneNumber: z.string().optional(),
+  amountSpent: z.number().positive().optional(),
 }).refine(data => data.qrData || data.phoneNumber, {
   message: "Either qrData or phoneNumber is required",
 });
@@ -23,6 +24,9 @@ const createCampaignSchema = z.object({
   type: z.enum(["stamp", "points", "discount"]),
   value: z.number().positive(),
   endDate: z.string().optional(),
+  qualificationType: z.enum(["visits", "money", "scan"]).optional(),
+  requiredVisits: z.number().positive().optional(),
+  requiredAmount: z.number().positive().optional(),
 });
 
 router.get("/dashboard", BrandController.getDashboard);
