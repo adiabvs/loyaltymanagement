@@ -84,8 +84,8 @@ export const loyaltyService = {
       const response = await apiClient.get(`/customer/promotions`);
       return response.promotions || [];
     } catch (error) {
-      console.warn("API call failed, using fallback:", error);
-      return fallbackData.campaigns.filter((c) => c.isActive);
+      console.error("Failed to fetch promotions:", error);
+      return []; // Return empty array instead of fallback data
     }
   },
 
@@ -142,6 +142,16 @@ export const loyaltyService = {
     try {
       const response = await apiClient.post(`/brand/campaigns`, campaignData);
       return response.campaign;
+    } catch (error) {
+      console.warn("API call failed:", error);
+      throw error;
+    }
+  },
+
+  async getBrandCustomers(brandId) {
+    try {
+      const response = await apiClient.get(`/brand/customers`);
+      return response.customers || [];
     } catch (error) {
       console.warn("API call failed:", error);
       throw error;

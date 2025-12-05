@@ -21,23 +21,34 @@ export function BrandCustomersScreen() {
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      // This would call an API endpoint to get customer list
-      // For now, using mock data
-      const mockCustomers = [
-        { id: "1", name: "John Doe", phone: "+1234567890", visits: 12, lastVisit: "2 days ago", status: "active" },
-        { id: "2", name: "Jane Smith", phone: "+1234567891", visits: 8, lastVisit: "5 days ago", status: "active" },
-        { id: "3", name: "Mike Johnson", phone: "+1234567892", visits: 3, lastVisit: "2 weeks ago", status: "inactive" },
-      ];
+      const response = await loyaltyService.getBrandCustomers(user?.id);
+      const customersData = response || [];
       
-      setCustomers(mockCustomers);
+      setCustomers(customersData);
+      
+      // Calculate stats from real data
+      const totalVisits = customersData.reduce((sum, c) => sum + (c.visits || 0), 0);
+      const activeCount = customersData.filter(c => c.status === "active").length;
+      const avgVisits = customersData.length > 0 
+        ? Math.round(totalVisits / customersData.length) 
+        : 0;
+      
       setStats({
-        totalCustomers: mockCustomers.length,
-        activeCustomers: mockCustomers.filter(c => c.status === "active").length,
-        totalVisits: mockCustomers.reduce((sum, c) => sum + c.visits, 0),
-        avgVisitsPerCustomer: Math.round(mockCustomers.reduce((sum, c) => sum + c.visits, 0) / mockCustomers.length),
+        totalCustomers: customersData.length,
+        activeCustomers: activeCount,
+        totalVisits: totalVisits,
+        avgVisitsPerCustomer: avgVisits,
       });
     } catch (error) {
       console.error("Failed to load customers:", error);
+      // Set empty state on error
+      setCustomers([]);
+      setStats({
+        totalCustomers: 0,
+        activeCustomers: 0,
+        totalVisits: 0,
+        avgVisitsPerCustomer: 0,
+      });
     } finally {
       setLoading(false);
     }

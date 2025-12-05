@@ -28,6 +28,7 @@ router.get("/campaigns", BrandController.getCampaigns);
 router.post("/campaigns", validate(createCampaignSchema), BrandController.createCampaign);
 router.put("/campaigns/:campaignId", BrandController.updateCampaign);
 router.delete("/campaigns/:campaignId", BrandController.deleteCampaign);
+router.get("/customers", BrandController.getCustomers);
 
 export default router;
 

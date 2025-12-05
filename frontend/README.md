@@ -40,13 +40,41 @@ npm install
 
 ### 2. Environment Setup
 
-Create a `.env` file (optional):
+The app uses a centralized config file (`src/config/index.js`) that manages environment-specific settings.
+
+#### Option 1: Environment Variables (Recommended)
+
+Create a `.env` file in the `frontend` directory:
 
 ```env
+# Development
+EXPO_PUBLIC_ENV=development
 EXPO_PUBLIC_API_URL=http://localhost:3000/api
+
+# For mobile devices on same network, use your computer's IP:
+# EXPO_PUBLIC_API_URL=http://192.168.1.100:3000/api
 ```
 
-In production, set this to your backend API URL.
+For production:
+
+```env
+EXPO_PUBLIC_ENV=production
+EXPO_PUBLIC_API_URL=https://api.yourdomain.com/api
+```
+
+#### Option 2: Direct Config File
+
+Edit `src/config/index.js` to set default URLs for each environment:
+
+```javascript
+const DEFAULT_API_URLS = {
+  development: 'http://localhost:3000/api',
+  staging: 'https://staging-api.yourdomain.com/api',
+  production: 'https://api.yourdomain.com/api',
+};
+```
+
+**Note:** Environment variables (Option 1) take precedence over config file defaults.
 
 ### 3. Start Development Server
 
@@ -133,9 +161,34 @@ eas build --platform android
 eas build --platform ios
 ```
 
-## Environment Variables
+## Configuration
 
-- `EXPO_PUBLIC_API_URL` - Backend API URL (default: `http://localhost:3000/api`)
+### Environment Variables
+
+The app supports the following environment variables (prefixed with `EXPO_PUBLIC_` for Expo):
+
+- `EXPO_PUBLIC_ENV` - Environment name (`development`, `staging`, `production`)
+- `EXPO_PUBLIC_API_URL` - Backend API URL (overrides default for current environment)
+
+### Config File
+
+Configuration is managed in `src/config/index.js`:
+
+- **Development**: `http://localhost:3000/api` (default)
+- **Staging**: `https://staging-api.yourdomain.com/api` (update in config)
+- **Production**: `https://api.yourdomain.com/api` (update in config)
+
+### Mobile Device Testing
+
+When testing on a physical device, replace `localhost` with your computer's IP address:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.100:3000/api
+```
+
+Find your IP address:
+- **Windows**: `ipconfig` (look for IPv4 Address)
+- **Mac/Linux**: `ifconfig` or `ip addr`
 
 ## Troubleshooting
 

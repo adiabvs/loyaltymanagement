@@ -1,18 +1,7 @@
 // API Client for backend communication
-// Replace localhost with your backend URL in production
+import config from '../config';
 
-// For web, use localhost. For mobile devices, use your computer's IP address
-const getApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Default to localhost for web development
-  // For mobile: replace with your computer's IP (e.g., http://192.168.1.100:3000/api)
-  return "http://localhost:3000/api";
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = config.api.baseUrl;
 
 class ApiClient {
   constructor() {

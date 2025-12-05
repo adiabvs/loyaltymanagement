@@ -20,7 +20,7 @@ export function BrandDashboardScreen() {
     setLoading(false);
   };
 
-  // Calculate customer retention percentage (mock calculation)
+  // Calculate customer retention percentage from real metrics
   const customerRetention = metrics.totalCustomers > 0 
     ? Math.round((metrics.returningCustomers / metrics.totalCustomers) * 100)
     : 0;

@@ -232,11 +232,31 @@ export class FirebaseDatabase implements IDatabaseAdapter {
       ...createRepository<Campaign>('campaigns'),
       create: async (data: Omit<Campaign, "id" | "createdAt">) => {
         const docRef = this.db.collection('campaigns').doc();
-        const campaignData = {
-          ...data,
+        
+        // Build campaign data, filtering out undefined values
+        const campaignData: any = {
+          brandId: data.brandId,
+          title: data.title,
+          description: data.description,
+          type: data.type,
+          value: data.value,
+          isActive: data.isActive !== undefined ? data.isActive : true,
           id: docRef.id,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
+        
+        // Handle startDate - use provided date or server timestamp
+        if (data.startDate) {
+          campaignData.startDate = data.startDate;
+        } else {
+          campaignData.startDate = admin.firestore.FieldValue.serverTimestamp();
+        }
+        
+        // Only include endDate if it's defined (not undefined or null)
+        if (data.endDate !== undefined && data.endDate !== null) {
+          campaignData.endDate = data.endDate;
+        }
+        
         await docRef.set(campaignData);
         const createdDoc = await docRef.get();
         const docData = createdDoc.data();

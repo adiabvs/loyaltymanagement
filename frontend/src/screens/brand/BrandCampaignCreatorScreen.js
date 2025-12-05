@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider";
 import { loyaltyService } from "../../services/loyaltyService";
 
 export function BrandCampaignCreatorScreen({ onBack }) {
+  const navigation = useNavigation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,7 +26,7 @@ export function BrandCampaignCreatorScreen({ onBack }) {
 
     setLoading(true);
     try {
-      await loyaltyService.createCampaign(user?.id, {
+      const campaign = await loyaltyService.createCampaign(user?.id, {
         title: formData.offerName,
         description: formData.description,
         type: formData.type,
@@ -34,9 +36,25 @@ export function BrandCampaignCreatorScreen({ onBack }) {
         endDate: formData.endDate ? new Date(formData.endDate) : undefined,
       });
       
-      Alert.alert("Success", "Campaign created successfully!", [
-        { text: "OK", onPress: () => onBack?.() }
-      ]);
+      // Close the creator screen first
+      onBack?.();
+      
+      // Then show success message and navigate to Offers tab
+      setTimeout(() => {
+        Alert.alert(
+          "✅ Campaign Created!", 
+          `"${campaign?.title || formData.offerName}" has been created successfully. Your customers will now see this promotion!`,
+          [
+            { 
+              text: "View Campaigns", 
+              onPress: () => {
+                // Ensure we're on the Offers tab
+                navigation?.navigate('Offers');
+              }
+            }
+          ]
+        );
+      }, 100);
     } catch (error) {
       Alert.alert("Error", error.message || "Failed to create campaign");
     } finally {

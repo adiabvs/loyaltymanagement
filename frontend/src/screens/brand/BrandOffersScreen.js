@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider";
 import { loyaltyService } from "../../services/loyaltyService";
 import { BrandCampaignCreatorScreen } from "./BrandCampaignCreatorScreen";
 
 export function BrandOffersScreen() {
+  const navigation = useNavigation();
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [showCreator, setShowCreator] = useState(false);
@@ -14,11 +16,28 @@ export function BrandOffersScreen() {
     loadCampaigns();
   }, []);
 
+  // Reload campaigns when screen comes into focus (e.g., after creating a campaign)
+  useEffect(() => {
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      loadCampaigns();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const loadCampaigns = async () => {
     try {
       setLoading(true);
       const data = await loyaltyService.getBrandCampaigns(user?.id);
-      setCampaigns(data || []);
+      // Sort campaigns: active first, then by creation date (newest first)
+      const sorted = (data || []).sort((a, b) => {
+        if (a.isActive !== b.isActive) {
+          return a.isActive ? -1 : 1;
+        }
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      setCampaigns(sorted);
     } catch (error) {
       console.error("Failed to load campaigns:", error);
       // Fallback to empty array
