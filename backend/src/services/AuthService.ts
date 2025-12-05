@@ -49,7 +49,7 @@ export class AuthService {
     return jwt.verify(token, this.JWT_SECRET) as { phoneOrEmail: string; role: UserRole };
   }
 
-  static async requestOTP(phoneNumber: string): Promise<{ success: boolean; message: string }> {
+  static async requestOTP(phoneNumber: string, role?: UserRole): Promise<{ success: boolean; message: string }> {
     try {
       // Generate random 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -58,12 +58,23 @@ export class AuthService {
       let user = await User.findByPhone(phoneNumber);
       
       if (!user) {
-        // Create a new user with default role CUSTOMER if not exists
+        // Create a new user with specified role or default to CUSTOMER
+        const userRole = (role as UserRole) || USER_ROLE.CUSTOMER;
+        console.log('[AuthService.requestOTP] Creating new user with role:', userRole);
         const userId = await User.create({
           phoneNumber,
-role: USER_ROLE.CUSTOMER,
+          role: userRole,
         });
         user = await User.findById(userId);
+        console.log('[AuthService.requestOTP] Created user:', { id: user?.id, role: user?.role });
+      } else if (role && user.role !== role) {
+        // Update existing user's role if different role is specified
+        console.log('[AuthService.requestOTP] Updating user role from', user.role, 'to', role);
+        await User.updateUser(user.id!, { role: role as UserRole });
+        user = await User.findById(user.id!);
+        console.log('[AuthService.requestOTP] Updated user role:', user?.role);
+      } else {
+        console.log('[AuthService.requestOTP] Using existing user with role:', user.role);
       }
 
       if (!user || !user.id) {
@@ -125,7 +136,7 @@ role: USER_ROLE.CUSTOMER,
     }
   }
 
-  static async verifyOTP(phoneNumber: string, otp: string): Promise<{ 
+  static async verifyOTP(phoneNumber: string, otp: string, role?: UserRole): Promise<{ 
     success: boolean; 
     token?: string; 
     user?: {
@@ -143,8 +154,20 @@ role: USER_ROLE.CUSTOMER,
         return { success: false, message: "User not found" };
       }
 
+      // Update user role if provided and different
+      if (role && user.role !== role) {
+        console.log('[AuthService.verifyOTP] Updating user role from', user.role, 'to', role);
+        await User.updateUser(user.id, { role: role as UserRole });
+        // Refresh user data
+        const updatedUser = await User.findById(user.id);
+        if (updatedUser) {
+          user = updatedUser;
+          console.log('[AuthService.verifyOTP] User role updated to:', user.role);
+        }
+      }
+
       // Verify the OTP
-      console.log('[AuthService] Verifying OTP:', { userId: user.id, phoneNumber, otp });
+      console.log('[AuthService] Verifying OTP:', { userId: user.id, phoneNumber, otp, role: user.role });
       const isValidOtp = await User.verifyOtp(user.id, otp);
       if (!isValidOtp) {
         console.log('[AuthService] OTP verification failed');

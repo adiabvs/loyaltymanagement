@@ -2,18 +2,20 @@ import { apiClient } from "./apiClient";
 
 export const authService = {
   // Request OTP for phone number
-  async requestOTP(phoneNumber) {
+  async requestOTP(phoneNumber, role) {
     const response = await apiClient.post("/otp/request", {
       phoneNumber,
+      role, // Include role when requesting OTP
     });
     return response;
   },
 
   // Verify OTP and sign in
-  async verifyOTP(phoneNumber, otp) {
+  async verifyOTP(phoneNumber, otp, role) {
     const response = await apiClient.post("/otp/verify", {
       phoneNumber,
       otp,
+      role, // Include role when verifying OTP (to update if needed)
     });
     if (response.token) {
       apiClient.setToken(response.token);

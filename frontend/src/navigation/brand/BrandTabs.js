@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { BrandDashboardScreen } from "../../screens/brand/BrandDashboardScreen";
 import { BrandScannerScreen } from "../../screens/brand/BrandScannerScreen";
 import { BrandOffersScreen } from "../../screens/brand/BrandOffersScreen";
+import { BrandCustomersScreen } from "../../screens/brand/BrandCustomersScreen";
 import { BrandHelpScreen } from "../../screens/brand/BrandHelpScreen";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -17,6 +18,8 @@ function LogoutButton() {
     </TouchableOpacity>
   );
 }
+
+// OffersStack is handled within BrandOffersScreen itself
 
 export function BrandTabs() {
   return (
@@ -44,6 +47,7 @@ export function BrandTabs() {
       <Tab.Screen name="Dashboard" component={BrandDashboardScreen} />
       <Tab.Screen name="Scan" component={BrandScannerScreen} />
       <Tab.Screen name="Offers" component={BrandOffersScreen} />
+      <Tab.Screen name="Customers" component={BrandCustomersScreen} />
       <Tab.Screen name="Help" component={BrandHelpScreen} />
     </Tab.Navigator>
   );

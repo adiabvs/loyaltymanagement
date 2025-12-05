@@ -8,22 +8,36 @@ import { BrandTabs } from "./brand/BrandTabs";
 const Stack = createNativeStackNavigator();
 
 export function RootNavigator() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Debug logging
+  console.log('[RootNavigator] Current state:', { 
+    hasUser: !!user, 
+    userRole: user?.role, 
+    loading,
+    userObject: user 
+  });
+
+  // Show loading screen while checking auth
+  if (loading) {
+    return null; // Or a loading component
+  }
 
   return (
     <Stack.Navigator
+      key={user?.role || 'auth'} // Force re-render when role changes
       screenOptions={{
         headerShown: false,
       }}
     >
-      {!user && (
-        <Stack.Screen name="Auth" component={AuthScreen} options={{}} />
-      )}
-      {user?.role === "customer" && (
+      {!user ? (
+        <Stack.Screen name="Auth" component={AuthScreen} />
+      ) : user.role === "customer" ? (
         <Stack.Screen name="Customer" component={CustomerTabs} />
-      )}
-      {user?.role === "brand" && (
+      ) : user.role === "brand" ? (
         <Stack.Screen name="Brand" component={BrandTabs} />
+      ) : (
+        <Stack.Screen name="Auth" component={AuthScreen} />
       )}
     </Stack.Navigator>
   );

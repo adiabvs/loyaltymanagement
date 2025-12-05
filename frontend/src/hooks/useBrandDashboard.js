@@ -8,6 +8,8 @@ export function useBrandDashboard(brandId) {
     totalVisits: 0,
     returningCustomers: 0,
     redemptions: 0,
+    activeCampaigns: 0,
+    totalCustomers: 0,
   });
 
   const refresh = async () => {

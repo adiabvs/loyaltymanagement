@@ -56,7 +56,7 @@ export function BrandScannerScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Scan Customer QR</Text>
       <Text style={styles.subtitle}>
-        Point the camera at the customer&apos;s QR to credit a visit.
+        Point the camera at the customer&apos;s QR code to credit a visit. Zero integration hassle - just scan and start rewarding.
       </Text>
 
       <View style={styles.scannerFrame}>

@@ -7,8 +7,8 @@ export class OTPController {
    */
   static async requestOTP(req: Request, res: Response): Promise<void> {
     try {
-      const { phoneNumber } = req.body;
-      const result = await AuthService.requestOTP(phoneNumber);
+      const { phoneNumber, role } = req.body;
+      const result = await AuthService.requestOTP(phoneNumber, role);
       res.json(result);
     } catch (error: any) {
       console.error('OTP request error:', error);
@@ -24,9 +24,9 @@ export class OTPController {
    */
   static async verifyOTP(req: Request, res: Response): Promise<void> {
     try {
-      const { phoneNumber, otp } = req.body;
+      const { phoneNumber, otp, role } = req.body;
       
-      const result = await AuthService.verifyOTP(phoneNumber, otp);
+      const result = await AuthService.verifyOTP(phoneNumber, otp, role);
       
       if (!result.success) {
         res.status(400).json({ 

@@ -18,7 +18,7 @@ export function AuthScreen() {
     }
     setLoading(true);
     try {
-      const response = await authService.requestOTP(phoneNumber);
+      const response = await authService.requestOTP(phoneNumber, role);
       if (response.success) {
         setOtpSent(true);
         Alert.alert("Success", "OTP sent to your phone number");
@@ -43,7 +43,7 @@ export function AuthScreen() {
     }
     setLoading(true);
     try {
-      const response = await authService.verifyOTP(phoneNumber, otp);
+      const response = await authService.verifyOTP(phoneNumber, otp, role);
       if (response.success && response.token && response.user) {
         // User is authenticated, set user in context
         setUserFromOTP(response.user);

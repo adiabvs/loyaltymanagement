@@ -46,6 +46,8 @@ export function AuthProvider({ children }) {
   };
 
   const setUserFromOTP = (user) => {
+    console.log('[AuthProvider] Setting user from OTP:', user);
+    console.log('[AuthProvider] User role:', user?.role);
     setUser(user);
   };
 

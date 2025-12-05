@@ -98,6 +98,7 @@ export const loyaltyService = {
         returningCustomers: response.metrics?.returningCustomers || 0,
         redemptions: response.metrics?.redemptions || 0,
         activeCampaigns: response.metrics?.activeCampaigns || 0,
+        totalCustomers: response.metrics?.totalCustomers || 0,
       };
     } catch (error) {
       console.warn("API call failed, using fallback:", error);
@@ -107,6 +108,7 @@ export const loyaltyService = {
         returningCustomers: 0,
         redemptions: 0,
         activeCampaigns: 0,
+        totalCustomers: 0,
       };
     }
   },
