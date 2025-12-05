@@ -1,0 +1,30 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+*.log
+.DS_Store
+.env.local
+.env.*.local
+
+# Expo
+.expo/
+web-build/
+
+# iOS
+ios/Pods/
+ios/build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+
+# Android
+android/app/build/
+android/.gradle/
+*.apk
+*.aab
+
