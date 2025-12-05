@@ -21,7 +21,7 @@ export const authenticate = (
     const token = authHeader.substring(7);
     const decoded = AuthService.verifyToken(token);
 
-    req.userId = decoded.userId;
+    req.userId = decoded.phoneOrEmail; // Using phoneOrEmail as identifier
     req.userRole = decoded.role;
 
     next();

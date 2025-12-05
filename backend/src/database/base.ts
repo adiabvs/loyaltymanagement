@@ -96,18 +96,21 @@ export class InMemoryDatabase implements IDatabaseAdapter {
   }
 }
 
+// Import database implementations
+import { FirebaseDatabase } from './firebase';
+
 // Database factory
 let dbInstance: IDatabaseAdapter | null = null;
 
 export function getDatabase(): IDatabaseAdapter {
   if (!dbInstance) {
-    const dbType = process.env.DATABASE_TYPE || "memory";
+    // Support both DB_TYPE and DATABASE_TYPE, with DB_TYPE taking precedence
+    const dbType = process.env.DB_TYPE || process.env.DATABASE_TYPE || "memory";
     
     switch (dbType) {
       case "firebase":
-        // TODO: Import and return FirebaseDatabase
-        // return new FirebaseDatabase();
-        throw new Error("Firebase database not yet implemented");
+        dbInstance = new FirebaseDatabase();
+        break;
       case "supabase":
         // TODO: Import and return SupabaseDatabase
         // return new SupabaseDatabase();

@@ -46,6 +46,13 @@ class ApiClient {
 
       // Check if response is ok before trying to parse JSON
       if (!response.ok) {
+        // Don't throw error for 401 Unauthorized - it's expected when no token
+        if (response.status === 401) {
+          const error = new Error("Unauthorized");
+          error.status = 401;
+          throw error;
+        }
+        
         let errorMessage = `HTTP error! status: ${response.status}`;
         try {
           const errorData = await response.json();
@@ -60,11 +67,27 @@ class ApiClient {
       const data = await response.json();
       return data;
     } catch (error) {
+      // Don't log 401 errors as they're expected when no token
+      if (error.status === 401 || error.message.includes("Unauthorized") || error.message.includes("No token provided")) {
+        throw error; // Re-throw without logging
+      }
+      
       // Enhanced error handling
-      if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+      if (
+        error.message.includes("Failed to fetch") || 
+        error.message.includes("NetworkError") ||
+        error.message.includes("Network request failed") ||
+        error.name === "TypeError"
+      ) {
         console.error("API request failed: Cannot connect to backend server.");
-        console.error("Make sure the backend is running on:", API_BASE_URL);
-        throw new Error("Cannot connect to server. Please ensure the backend is running on port 3000.");
+        console.error("Attempted URL:", url);
+        console.error("Base URL:", API_BASE_URL);
+        console.error("Make sure the backend is running on:", API_BASE_URL.replace('/api', ''));
+        throw new Error(
+          `Cannot connect to server at ${API_BASE_URL}. ` +
+          `Please ensure the backend is running on port 3000. ` +
+          `Check: 1) Backend server is started, 2) Port 3000 is not blocked, 3) CORS is configured correctly.`
+        );
       }
       console.error("API request failed:", error);
       throw error;

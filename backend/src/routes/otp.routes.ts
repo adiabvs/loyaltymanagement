@@ -6,16 +6,18 @@ import { z } from "zod";
 const router = Router();
 
 const sendOTPSchema = z.object({
-  phoneOrEmail: z.string().min(1),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
 });
 
 const verifyOTPSchema = z.object({
-  otpId: z.string().uuid(),
-  code: z.string().length(6),
-  phoneOrEmail: z.string().min(1),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  otp: z.string().length(6, "OTP must be 6 digits"),
 });
 
-router.post("/send", validate(sendOTPSchema), OTPController.sendOTP);
+// Request OTP for login/signup
+router.post("/request", validate(sendOTPSchema), OTPController.requestOTP);
+
+// Verify OTP and authenticate user
 router.post("/verify", validate(verifyOTPSchema), OTPController.verifyOTP);
 
 export default router;

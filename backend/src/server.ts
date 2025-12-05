@@ -3,7 +3,6 @@ import cors from "cors";
 import { errorHandler } from "./middleware/errorHandler";
 import { requestLogger } from "./middleware/requestLogger";
 import { securityHeaders, sanitizeInput, requestSizeLimiter } from "./middleware/security";
-import { apiRateLimiter, authRateLimiter } from "./middleware/rateLimiter";
 import { getEnv } from "./utils/env";
 import { logger } from "./utils/logger";
 import { getDatabase } from "./database/base";
@@ -40,7 +39,7 @@ if (env.NODE_ENV !== "test") {
 }
 
 // Health check (no rate limiting)
-app.get("/health", async (req, res) => {
+app.get("/health", async (_req, res) => {
   try {
     const db = getDatabase();
     const dbHealthy = await db.healthCheck();
@@ -60,17 +59,17 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// API Routes with rate limiting
-app.use("/api/auth", authRateLimiter, authRoutes);
+// API Routes
+app.use("/api/auth", authRoutes);
 app.use("/api/otp", otpRoutes);
-app.use("/api/customer", apiRateLimiter, customerRoutes);
-app.use("/api/brand", apiRateLimiter, brandRoutes);
+app.use("/api/customer", customerRoutes);
+app.use("/api/brand", brandRoutes);
 
 // Error handling
 app.use(errorHandler);
 
 // 404 handler
-app.use((req, res) => {
+app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 

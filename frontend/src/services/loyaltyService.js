@@ -37,17 +37,23 @@ export const loyaltyService = {
   },
 
   async buildQrPayload(customerId) {
+    if (!customerId) {
+      return null;
+    }
     try {
       const response = await apiClient.get(`/customer/qr`);
-      return response.qrPayload;
+      return response.qrPayload || null;
     } catch (error) {
       console.warn("API call failed, using fallback:", error);
-      // Fallback
-      return JSON.stringify({
-        type: "visit",
-        customerId,
-        issuedAt: Date.now(),
-      });
+      // Fallback - only if we have a customerId
+      if (customerId) {
+        return JSON.stringify({
+          type: "visit",
+          customerId,
+          issuedAt: Date.now(),
+        });
+      }
+      return null;
     }
   },
 

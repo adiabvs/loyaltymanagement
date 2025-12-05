@@ -17,7 +17,11 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         // No valid token, user needs to sign in
-        console.log("No existing session");
+        // Only log if it's not a 401 (expected when no token)
+        if (error.status !== 401 && !error.message.includes("Unauthorized")) {
+          console.error("Auth check failed:", error);
+        }
+        // Silently handle 401 - it's expected when there's no token
       } finally {
         setLoading(false);
       }
@@ -27,13 +31,22 @@ export function AuthProvider({ children }) {
 
   const signIn = async ({ phoneOrEmail, role }) => {
     try {
+      // This is a legacy method - for OTP flow, use requestOTP and verifyOTP directly
       const response = await authService.signIn(phoneOrEmail, role);
-      setUser(response.user);
-      return response.user;
+      if (response.user) {
+        setUser(response.user);
+        return response.user;
+      }
+      // If response requires OTP, return it
+      return response;
     } catch (error) {
       console.error("Sign in failed:", error);
       throw error;
     }
+  };
+
+  const setUserFromOTP = (user) => {
+    setUser(user);
   };
 
   const signUp = async (data) => {
@@ -59,6 +72,7 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signOut,
+      setUserFromOTP,
     }),
     [user, loading]
   );

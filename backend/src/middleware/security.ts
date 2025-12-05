@@ -8,7 +8,7 @@ import { Request, Response, NextFunction } from "express";
  */
 
 // Basic input sanitization (remove script tags, etc.)
-export const sanitizeInput = (req: Request, res: Response, next: NextFunction): void => {
+export const sanitizeInput = (_req: Request, _res: Response, next: NextFunction): void => {
   const sanitize = (obj: any): any => {
     if (typeof obj === "string") {
       return obj
@@ -29,14 +29,15 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction): 
     return obj;
   };
 
-  if (req.body) {
-    req.body = sanitize(req.body);
+  // Sanitize request body, query, and params
+  if (_req.body) {
+    _req.body = sanitize(_req.body);
   }
-  if (req.query) {
-    req.query = sanitize(req.query);
+  if (_req.query) {
+    _req.query = sanitize(_req.query);
   }
-  if (req.params) {
-    req.params = sanitize(req.params);
+  if (_req.params) {
+    _req.params = sanitize(_req.params);
   }
 
   next();
@@ -59,7 +60,7 @@ export const requestSizeLimiter = (maxSize: number = 1024 * 1024) => {
 };
 
 // Security headers
-export const securityHeaders = (req: Request, res: Response, next: NextFunction): void => {
+export const securityHeaders = (_req: Request, res: Response, next: NextFunction): void => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");

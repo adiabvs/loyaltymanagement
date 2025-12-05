@@ -56,7 +56,7 @@ export class CustomerController {
     }
   }
 
-  static async getPromotions(req: AuthRequest, res: Response): Promise<void> {
+  static async getPromotions(_req: AuthRequest, res: Response): Promise<void> {
     try {
       const promotions = LoyaltyService.getActivePromotions();
       res.json({ promotions });

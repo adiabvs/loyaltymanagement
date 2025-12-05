@@ -31,7 +31,11 @@ export function CustomerHomeScreen() {
           Show this code at the counter to earn a stamp.
         </Text>
         <View style={styles.qrWrapper}>
-          <QRCode value={qrPayload} size={180} backgroundColor="transparent" />
+          {qrPayload ? (
+            <QRCode value={qrPayload} size={180} backgroundColor="transparent" />
+          ) : (
+            <Text style={styles.loadingText}>Loading QR code...</Text>
+          )}
         </View>
         <Text style={styles.progressText}>
           Visits: {visits} / {stampsToReward}
@@ -86,6 +90,12 @@ const styles = StyleSheet.create({
   progressText: {
     color: "#E5E7EB",
     textAlign: "center",
+  },
+  loadingText: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    textAlign: "center",
+    padding: 20,
   },
 });
 

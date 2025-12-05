@@ -23,5 +23,9 @@
     "express"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "express-rate-limit": "^8.2.1",
+    "twilio": "^5.10.7"
+  }
 }
