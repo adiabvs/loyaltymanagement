@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, TextInput } from "react-native";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import { useAuth } from "../../providers/AuthProvider";
 import { useBrandDashboard } from "../../hooks/useBrandDashboard";
+import { loyaltyService } from "../../services/loyaltyService";
 
 export function BrandScannerScreen() {
   const { user } = useAuth();
@@ -10,6 +11,9 @@ export function BrandScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [inputMode, setInputMode] = useState(null); // 'phone' or 'camera'
 
   useEffect(() => {
     (async () => {
@@ -46,37 +50,74 @@ export function BrandScannerScreen() {
   };
 
   const handleWebManualInput = () => {
-    // For web, use browser prompt to ask for phone number
+    setShowPhoneInput(true);
+    setInputMode('phone');
+  };
+
+  const handleWebCameraInput = () => {
+    setShowPhoneInput(false);
+    setInputMode('camera');
+    setScanning(true);
+  };
+
+  const handleFileUpload = () => {
+    // Create a file input element for QR code image upload
     if (Platform.OS === 'web') {
-      const phoneNumber = window.prompt("Enter customer phone number (last 10 digits):");
-      if (phoneNumber && phoneNumber.trim()) {
-        // Process phone number instead of QR data
-        handlePhoneNumberInput(phoneNumber.trim());
-      }
-    } else {
-      Alert.alert(
-        "Manual Entry",
-        "Please use the camera to scan QR code, or use the web version for manual entry.",
-        [{ text: "OK" }]
-      );
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          // For now, we'll show an alert - in a real app, you'd use a QR code reader library
+          Alert.alert(
+            "File Upload",
+            "QR code image upload detected. Please enter the phone number or use camera scanning instead.",
+            [{ text: "OK" }]
+          );
+        }
+      };
+      input.click();
     }
   };
 
-  const handlePhoneNumberInput = async (phoneNumber: string) => {
+  const handlePhoneNumberInput = async (phoneNum) => {
+    const phoneToProcess = phoneNum || phoneNumber;
+    if (!phoneToProcess || !phoneToProcess.trim()) {
+      Alert.alert("Error", "Please enter a phone number");
+      return;
+    }
+    
     setScanning(false);
+    setShowPhoneInput(false);
     try {
       // Call API with phone number instead of QR data
-      const result = await loyaltyService.processVisitFromPhone(user?.id, phoneNumber);
+      const result = await loyaltyService.processVisitFromPhone(user?.id, phoneToProcess.trim());
       setLastResult({
         success: true,
-        visits: result.customer.visits,
+        visits: result.customer?.visits || 0,
       });
+      setPhoneNumber(""); // Clear input
       setTimeout(() => setLastResult(null), 3000);
     } catch (e) {
       setLastResult({
         success: false,
-        error: e.message,
+        error: e.message || "Failed to process phone number",
       });
+      // On error, allow user to try camera scanning
+      if (Platform.OS !== 'web' && hasPermission) {
+        Alert.alert(
+          "Phone Entry Failed",
+          e.message || "Customer not found. Would you like to try scanning a QR code instead?",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Try Camera", onPress: () => {
+              setInputMode('camera');
+              setScanning(true);
+            }}
+          ]
+        );
+      }
       setTimeout(() => setLastResult(null), 5000);
     }
   };
@@ -113,17 +154,73 @@ export function BrandScannerScreen() {
               Web Scanner
             </Text>
             <Text style={styles.webScannerSubtext}>
-              Enter customer phone number to credit a visit
+              Choose how you want to process the visit
             </Text>
-            <TouchableOpacity
-              style={styles.webButton}
-              onPress={handleWebManualInput}
-            >
-              <Text style={styles.webButtonText}>Enter Phone Number</Text>
-            </TouchableOpacity>
-            <Text style={styles.webHelpText}>
-              Enter the last 10 digits of the customer's phone number
-            </Text>
+            
+            {showPhoneInput ? (
+              <View style={styles.phoneInputContainer}>
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="Enter last 10 digits of phone number"
+                  placeholderTextColor="#6B7280"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  autoFocus
+                />
+                <View style={styles.phoneInputButtons}>
+                  <TouchableOpacity
+                    style={[styles.webButton, styles.webButtonSecondary]}
+                    onPress={() => {
+                      setShowPhoneInput(false);
+                      setPhoneNumber("");
+                    }}
+                  >
+                    <Text style={styles.webButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.webButton}
+                    onPress={() => handlePhoneNumberInput()}
+                  >
+                    <Text style={styles.webButtonText}>Submit</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : inputMode === 'camera' && scanning ? (
+              <View style={styles.cameraContainer}>
+                <Text style={styles.webScannerSubtext}>
+                  Camera scanning is not available on web. Please use phone number entry or try on a mobile device.
+                </Text>
+                <TouchableOpacity
+                  style={styles.webButton}
+                  onPress={() => {
+                    setScanning(false);
+                    setInputMode(null);
+                  }}
+                >
+                  <Text style={styles.webButtonText}>Back</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.webOptionsContainer}>
+                <TouchableOpacity
+                  style={styles.webButton}
+                  onPress={handleWebManualInput}
+                >
+                  <Text style={styles.webButtonText}>Enter Phone Number</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.webButton, styles.webButtonSecondary]}
+                  onPress={handleWebCameraInput}
+                >
+                  <Text style={styles.webButtonText}>Try Camera Scan</Text>
+                </TouchableOpacity>
+                <Text style={styles.webHelpText}>
+                  Enter the last 10 digits of the customer's phone number, or use camera scanning on mobile devices
+                </Text>
+              </View>
+            )}
           </View>
         ) : scanning ? (
           <BarCodeScanner
@@ -133,7 +230,15 @@ export function BrandScannerScreen() {
           />
         ) : (
           <View style={styles.idleBox}>
-            <Text style={styles.idleText}>Tap &quot;Start Scan&quot;</Text>
+            <Text style={styles.idleText}>Tap &quot;Start Scan&quot; to scan QR code</Text>
+            {hasPermission && (
+              <TouchableOpacity
+                style={[styles.webButton, { marginTop: 16, minWidth: 200 }]}
+                onPress={handleWebManualInput}
+              >
+                <Text style={styles.webButtonText}>Or Enter Phone Number</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -144,6 +249,7 @@ export function BrandScannerScreen() {
           onPress={() => {
             setScanning((prev) => !prev);
             setLastResult(null); // Clear previous result when starting new scan
+            setInputMode(scanning ? null : 'camera');
           }}
         >
           <Text style={styles.ctaText}>
@@ -281,6 +387,40 @@ const styles = StyleSheet.create({
     color: "#020617",
     fontWeight: "600",
     fontSize: 14,
+  },
+  webButtonSecondary: {
+    backgroundColor: "#1E293B",
+    marginLeft: 8,
+  },
+  phoneInputContainer: {
+    width: "100%",
+    maxWidth: 400,
+    paddingHorizontal: 20,
+  },
+  phoneInput: {
+    backgroundColor: "#1E293B",
+    color: "white",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#374151",
+  },
+  phoneInputButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  webOptionsContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  cameraContainer: {
+    width: "100%",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
 });
 
