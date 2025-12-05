@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import { useAuth } from "../../providers/AuthProvider";
 import { useBrandDashboard } from "../../hooks/useBrandDashboard";
@@ -13,12 +13,19 @@ export function BrandScannerScreen() {
 
   useEffect(() => {
     (async () => {
+      // On web, we'll use file input instead of camera
+      if (Platform.OS === 'web') {
+        setHasPermission(true); // Web doesn't need camera permission
+        return;
+      }
+      
       const { status } = await BarCodeScanner.requestPermissionsAsync();
       setHasPermission(status === "granted");
     })();
   }, []);
 
   const handleScanned = async ({ data }) => {
+    if (!scanning) return; // Prevent multiple scans
     setScanning(false);
     try {
       const result = await processQr(data);
@@ -26,11 +33,33 @@ export function BrandScannerScreen() {
         success: true,
         visits: result.customer.visits,
       });
+      // Clear result after 3 seconds
+      setTimeout(() => setLastResult(null), 3000);
     } catch (e) {
       setLastResult({
         success: false,
         error: e.message,
       });
+      // Clear error after 5 seconds
+      setTimeout(() => setLastResult(null), 5000);
+    }
+  };
+
+  const handleWebManualInput = () => {
+    // For web, use browser prompt
+    if (Platform.OS === 'web') {
+      const qrData = window.prompt("Enter QR Code Data (paste the QR code JSON string here):");
+      if (qrData && qrData.trim()) {
+        handleScanned({ data: qrData.trim() });
+      }
+    } else {
+      // For mobile, Alert.prompt may not be available in all React Native versions
+      // Use a simple Alert with input field simulation
+      Alert.alert(
+        "Manual QR Entry",
+        "This feature requires a text input. Please use the web version or scan with camera.",
+        [{ text: "OK" }]
+      );
     }
   };
 
@@ -60,10 +89,29 @@ export function BrandScannerScreen() {
       </Text>
 
       <View style={styles.scannerFrame}>
-        {scanning ? (
+        {Platform.OS === 'web' ? (
+          <View style={styles.webScannerContainer}>
+            <Text style={styles.webScannerText}>
+              Web Scanner
+            </Text>
+            <Text style={styles.webScannerSubtext}>
+              Use one of the options below to scan QR codes
+            </Text>
+            <TouchableOpacity
+              style={styles.webButton}
+              onPress={handleWebManualInput}
+            >
+              <Text style={styles.webButtonText}>Enter QR Code Manually</Text>
+            </TouchableOpacity>
+            <Text style={styles.webHelpText}>
+              Paste the QR code JSON data in the prompt that appears
+            </Text>
+          </View>
+        ) : scanning ? (
           <BarCodeScanner
             style={StyleSheet.absoluteFillObject}
-            onBarCodeScanned={handleScanned}
+            onBarCodeScanned={scanning ? handleScanned : undefined}
+            barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
           />
         ) : (
           <View style={styles.idleBox}>
@@ -72,14 +120,19 @@ export function BrandScannerScreen() {
         )}
       </View>
 
-      <TouchableOpacity
-        style={styles.cta}
-        onPress={() => setScanning((prev) => !prev)}
-      >
-        <Text style={styles.ctaText}>
-          {scanning ? "Stop Scan" : "Start Scan"}
-        </Text>
-      </TouchableOpacity>
+      {Platform.OS !== 'web' && (
+        <TouchableOpacity
+          style={styles.cta}
+          onPress={() => {
+            setScanning((prev) => !prev);
+            setLastResult(null); // Clear previous result when starting new scan
+          }}
+        >
+          <Text style={styles.ctaText}>
+            {scanning ? "Stop Scan" : "Start Scan"}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {lastResult && (
         <View
@@ -169,6 +222,47 @@ const styles = StyleSheet.create({
   text: {
     color: "white",
     textAlign: "center",
+  },
+  webScannerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "#111827",
+  },
+  webScannerText: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  webScannerSubtext: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  webButton: {
+    backgroundColor: "#38BDF8",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    marginBottom: 12,
+    minWidth: 200,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  webHelpText: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: 12,
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  webButtonText: {
+    color: "#020617",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
 

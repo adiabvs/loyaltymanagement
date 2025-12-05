@@ -130,24 +130,34 @@ export class FirebaseDatabase implements IDatabaseAdapter {
       getByCustomer: async (customerId: string) => {
         const snapshot = await this.db.collection('visits')
           .where('customerId', '==', customerId)
-          .orderBy('timestamp', 'desc')
           .get();
-        return snapshot.docs.map(doc => ({
+        const visits = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           timestamp: doc.data().timestamp?.toDate() || new Date()
         } as Visit));
+        // Sort in memory to avoid requiring a composite index
+        return visits.sort((a, b) => {
+          const dateA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+          const dateB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+          return dateB - dateA; // Descending order (newest first)
+        });
       },
       getByBrand: async (brandId: string) => {
         const snapshot = await this.db.collection('visits')
           .where('brandId', '==', brandId)
-          .orderBy('timestamp', 'desc')
           .get();
-        return snapshot.docs.map(doc => ({
+        const visits = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           timestamp: doc.data().timestamp?.toDate() || new Date()
         } as Visit));
+        // Sort in memory to avoid requiring a composite index
+        return visits.sort((a, b) => {
+          const dateA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+          const dateB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+          return dateB - dateA; // Descending order (newest first)
+        });
       },
       getUniqueCustomersForBrand: async (brandId: string) => {
         const snapshot = await this.db.collection('visits')

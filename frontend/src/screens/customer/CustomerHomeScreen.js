@@ -32,9 +32,20 @@ export function CustomerHomeScreen() {
         </Text>
         <View style={styles.qrWrapper}>
           {qrPayload ? (
-            <QRCode value={qrPayload} size={180} backgroundColor="transparent" />
+            <View style={styles.qrContainer}>
+              <QRCode 
+                value={qrPayload} 
+                size={200} 
+                backgroundColor="#FFFFFF"
+                color="#000000"
+                logo={null}
+                ecl="M"
+              />
+            </View>
           ) : (
-            <Text style={styles.loadingText}>Loading QR code...</Text>
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading QR code...</Text>
+            </View>
           )}
         </View>
         <Text style={styles.progressText}>
@@ -80,12 +91,30 @@ const styles = StyleSheet.create({
   },
   qrWrapper: {
     alignSelf: "center",
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: "#020617",
-    borderWidth: 1,
-    borderColor: "#111827",
     marginBottom: 16,
+  },
+  qrContainer: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#1E293B",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingContainer: {
+    width: 200,
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#1E293B",
   },
   progressText: {
     color: "#E5E7EB",
