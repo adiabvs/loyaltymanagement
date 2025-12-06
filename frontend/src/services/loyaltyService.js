@@ -89,6 +89,31 @@ export const loyaltyService = {
     }
   },
 
+  async findBrandByPhone(phoneNumber) {
+    try {
+      const response = await apiClient.post(`/customer/find-brand-by-phone`, {
+        phoneNumber,
+      });
+      return response.brands || [];
+    } catch (error) {
+      console.error("Failed to find brand by phone:", error);
+      throw error;
+    }
+  },
+
+  async associateBrand(brandId, brandPhoneNumber) {
+    try {
+      const response = await apiClient.post(`/customer/associate-brand`, {
+        brandId,
+        brandPhoneNumber,
+      });
+      return response;
+    } catch (error) {
+      console.error("Failed to associate brand:", error);
+      throw error;
+    }
+  },
+
   // Brand methods
   async getBrandSnapshot(brandId) {
     try {

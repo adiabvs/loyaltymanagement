@@ -39,6 +39,7 @@ export interface Reward {
   id: string;
   customerId: string;
   brandId: string;
+  campaignId?: string; // Link to the campaign that generated this reward
   title: string;
   description: string;
   pointsRequired: number;

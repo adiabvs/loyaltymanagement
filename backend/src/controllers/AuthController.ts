@@ -19,6 +19,7 @@ const signUpSchema = z.object({
   role: z.enum(["customer", "brand"]).default("customer"),
 });
 
+
 export class AuthController {
   static async requestOtp(req: Request, res: Response): Promise<void> {
     try {

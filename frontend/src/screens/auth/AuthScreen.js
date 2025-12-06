@@ -5,20 +5,24 @@ import { authService } from "../../services/authService";
 
 export function AuthScreen() {
   const { setUserFromOTP } = useAuth();
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [otp, setOtp] = useState("");
   const [role, setRole] = useState("customer");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const COUNTRY_CODE = "+91";
+  const fullPhoneNumber = `${COUNTRY_CODE}${phoneDigits}`;
 
   const handleRequestOTP = async () => {
-    if (!phoneNumber.trim()) {
-      Alert.alert("Error", "Please enter your phone number");
+    if (!phoneDigits.trim() || phoneDigits.length !== 10) {
+      Alert.alert("Error", "Please enter a valid 10-digit phone number");
       return;
     }
+    
     setLoading(true);
     try {
-      const response = await authService.requestOTP(phoneNumber, role);
+      const response = await authService.requestOTP(fullPhoneNumber, role);
       if (response.success) {
         setOtpSent(true);
         Alert.alert("Success", "OTP sent to your phone number");
@@ -43,7 +47,7 @@ export function AuthScreen() {
     }
     setLoading(true);
     try {
-      const response = await authService.verifyOTP(phoneNumber, otp, role);
+      const response = await authService.verifyOTP(fullPhoneNumber, otp, role);
       if (response.success && response.token && response.user) {
         // User is authenticated, set user in context
         setUserFromOTP(response.user);
@@ -66,15 +70,25 @@ export function AuthScreen() {
       <Text style={styles.title}>Loyalty Pilot</Text>
       <Text style={styles.subtitle}>Sign in to continue</Text>
 
-      <TextInput
-        placeholder="Phone Number"
-        placeholderTextColor="#888"
-        style={styles.input}
-        value={phoneNumber}
-        onChangeText={setPhoneNumber}
-        keyboardType="phone-pad"
-        editable={!otpSent}
-      />
+      <View style={styles.phoneContainer}>
+        <View style={styles.countryCodeContainer}>
+          <Text style={styles.countryCode}>+91</Text>
+        </View>
+        <TextInput
+          placeholder="Enter 10-digit number"
+          placeholderTextColor="#888"
+          style={[styles.input, styles.phoneInput]}
+          value={phoneDigits}
+          onChangeText={(text) => {
+            // Only allow digits and limit to 10
+            const digits = text.replace(/\D/g, '').slice(0, 10);
+            setPhoneDigits(digits);
+          }}
+          keyboardType="phone-pad"
+          maxLength={10}
+          editable={!otpSent}
+        />
+      </View>
       
       {otpSent && (
         <TextInput
@@ -129,7 +143,7 @@ export function AuthScreen() {
         disabled={loading}
       >
         <Text style={styles.ctaText}>
-          {loading ? "Processing..." : otpSent ? "Verify OTP" : "Request OTP"}
+          {loading ? "Processing..." : (otpSent ? "Verify OTP" : "Request OTP")}
         </Text>
       </TouchableOpacity>
       
@@ -170,6 +184,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 32,
   },
+  phoneContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
+  countryCodeContainer: {
+    backgroundColor: "#111320",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#23263A",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  countryCode: {
+    color: "#888",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  phoneInput: {
+    flex: 1,
+  },
   input: {
     backgroundColor: "#111320",
     borderRadius: 12,
@@ -179,6 +215,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#23263A",
     marginBottom: 16,
+  },
+  helperText: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   roleSwitch: {
     flexDirection: "row",

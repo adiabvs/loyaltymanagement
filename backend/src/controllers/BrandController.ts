@@ -76,27 +76,39 @@ export class BrandController {
 
       // Support both QR code and phone number lookup
       if (phoneNumber) {
-        // Lookup by phone number (last 10 digits)
-        const phoneDigits = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-        const last10Digits = phoneDigits.slice(-10); // Get last 10 digits
+        // Find customer by matching last 10 digits of phone number
+        const { getFirebaseFirestore } = await import('../config/firebase');
+        const firestore = getFirebaseFirestore();
+        const { User } = await import('../models/User');
+        const providedPhoneLast10 = User.extractUsername(phoneNumber);
         
-        // Try to find customer by phone number (exact match or ending match)
-        // First try exact match
-        customer = await db.users.findByEmailOrPhone(last10Digits);
+        // Get all customers and match by last 10 digits of phone number
+        const customers = await firestore
+          .collection('users')
+          .where('role', '==', 'customer')
+          .get();
         
-        // If not found, try finding by partial match (phone ending with these digits)
-        if (!customer) {
-          // Use database query helper to find customers
-          const { database } = await import('../database/index');
-          const allUsers = await database.query('users', [['role', '==', 'customer']], 1000);
-          customer = allUsers.find((u: any) => {
-            const userPhone = u.phoneNumber?.replace(/\D/g, '') || '';
-            return userPhone.endsWith(last10Digits) || userPhone === last10Digits;
-          }) || null;
+        for (const doc of customers.docs) {
+          const customerData = doc.data();
+          const customerPhone = customerData.phoneNumber || customerData.phone || '';
+          
+          if (customerPhone) {
+            // Extract last 10 digits from customer phone number
+            const customerPhoneLast10 = User.extractUsername(customerPhone);
+            
+            // Match by last 10 digits
+            if (customerPhoneLast10 === providedPhoneLast10) {
+              customer = {
+                id: doc.id,
+                ...customerData
+              } as any;
+              break;
+            }
+          }
         }
         
         if (!customer || !customer.id) {
-          res.status(404).json({ error: "Customer not found with this phone number" });
+          res.status(404).json({ error: "Customer not found with the provided phone number." });
           return;
         }
         customerId = customer.id;
@@ -117,12 +129,16 @@ export class BrandController {
             return;
           }
 
-          customerId = payload.customerId;
-          customer = await db.users.findById(customerId);
-          if (!customer) {
+          // Find customer by customerId from QR
+          if (payload.customerId) {
+            customer = await db.users.findById(payload.customerId);
+          }
+          
+          if (!customer || !customer.id) {
             res.status(404).json({ error: "Customer not found" });
             return;
           }
+          customerId = customer.id;
         } catch (parseError) {
           res.status(400).json({ error: "Invalid QR code format" });
           return;
@@ -153,6 +169,95 @@ export class BrandController {
       // Get customer's current visits count
       const customerVisits = await db.visits.getByCustomer(customerId);
       const visitCount = customerVisits.length;
+
+      // Check and auto-create rewards for campaigns if customer qualifies
+      try {
+        const activeCampaigns = await db.campaigns.getActive(brandId);
+        const existingRewards = await db.rewards.getByCustomer(customerId);
+        const brandVisits = customerVisits.filter(v => v.brandId === brandId);
+        const brandVisitCount = brandVisits.length;
+        const totalAmountSpent = brandVisits.reduce((sum, v) => sum + ((v.amountSpent || 0)), 0);
+
+        for (const campaign of activeCampaigns) {
+          // Check if reward already exists for this campaign
+          const rewardExists = existingRewards.some(r => 
+            r.brandId === campaign.brandId && 
+            !r.isRedeemed &&
+            (r.campaignId === campaign.id || (r.title === campaign.title && r.brandId === campaign.brandId))
+          );
+
+          if (rewardExists) {
+            console.log(`Reward already exists for campaign ${campaign.id} - customer ${customerId}`);
+            continue;
+          }
+
+          // Check if customer qualifies for visits-based campaign
+          if (campaign.qualificationType === "visits" && campaign.requiredVisits) {
+            console.log(`Checking visits campaign ${campaign.id}: customer has ${brandVisitCount} visits, needs ${campaign.requiredVisits}`);
+            if (brandVisitCount >= campaign.requiredVisits) {
+              let pointsRequired = 0;
+              let stampsRequired = 0;
+              
+              if (campaign.type === "points") {
+                pointsRequired = campaign.value;
+              } else if (campaign.type === "stamp") {
+                stampsRequired = campaign.value;
+              }
+              
+              try {
+                const reward = await db.rewards.create({
+                  customerId,
+                  brandId: campaign.brandId,
+                  campaignId: campaign.id,
+                  title: campaign.title,
+                  description: campaign.description,
+                  pointsRequired,
+                  stampsRequired,
+                  isRedeemed: false,
+                });
+                
+                console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (visits: ${brandVisitCount} >= ${campaign.requiredVisits})`, reward);
+              } catch (createError: any) {
+                console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, createError);
+              }
+            }
+          }
+          // Check if customer qualifies for money-based campaign
+          else if (campaign.qualificationType === "money" && campaign.requiredAmount) {
+            console.log(`Checking money campaign ${campaign.id}: customer spent $${totalAmountSpent}, needs $${campaign.requiredAmount}`);
+            if (totalAmountSpent >= campaign.requiredAmount) {
+              let pointsRequired = 0;
+              let stampsRequired = 0;
+              
+              if (campaign.type === "points") {
+                pointsRequired = campaign.value;
+              } else if (campaign.type === "stamp") {
+                stampsRequired = campaign.value;
+              }
+              
+              try {
+                const reward = await db.rewards.create({
+                  customerId,
+                  brandId: campaign.brandId,
+                  campaignId: campaign.id,
+                  title: campaign.title,
+                  description: campaign.description,
+                  pointsRequired,
+                  stampsRequired,
+                  isRedeemed: false,
+                });
+                
+                console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (amount: $${totalAmountSpent} >= $${campaign.requiredAmount})`, reward);
+              } catch (createError: any) {
+                console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, createError);
+              }
+            }
+          }
+        }
+      } catch (rewardError: any) {
+        // Log error but don't fail the visit creation
+        console.error("Error checking/creating rewards after visit:", rewardError);
+      }
 
       res.json({
         success: true,
@@ -334,5 +439,6 @@ export class BrandController {
       res.status(500).json({ error: error.message || "Failed to fetch customers" });
     }
   }
+
 }
 

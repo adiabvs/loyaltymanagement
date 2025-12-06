@@ -113,6 +113,7 @@ export class AuthService {
     }
   }
 
+
   static async registerUser(phoneNumber: string, role: UserRole, name?: string, businessName?: string): Promise<{ success: boolean; userId?: string; message: string }> {
     try {
       // Check if user already exists

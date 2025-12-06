@@ -10,6 +10,7 @@ export const authService = {
     return response;
   },
 
+
   // Verify OTP and sign in
   async verifyOTP(phoneNumber, otp, role) {
     const response = await apiClient.post("/otp/verify", {
@@ -61,6 +62,7 @@ export const authService = {
   async getCurrentUser() {
     return apiClient.get("/auth/me");
   },
+
 
   signOut() {
     apiClient.clearToken();
