@@ -130,7 +130,7 @@ export class AuthService {
         return { success: false, message: "Username must be 3-20 characters, alphanumeric and underscore only" };
       }
 
-      // Check if username already exists
+      // Check if username already exists (excluding current user)
       const existingUser = await User.findByUsername(username);
       if (existingUser && existingUser.phoneNumber !== phoneNumber) {
         return { success: false, message: "Username already taken" };
@@ -147,21 +147,42 @@ export class AuthService {
           role: userRole,
         });
         user = await User.findById(userId);
+        console.log('[AuthService.setUsername] Created new user with username:', { userId, username });
       } else {
         // Update existing user with username
+        console.log('[AuthService.setUsername] Updating user:', { userId: user.id, username });
         await User.updateUser(user.id, { username });
         user = await User.findById(user.id);
+        console.log('[AuthService.setUsername] User updated, verifying:', { userId: user?.id, savedUsername: (user as any)?.username });
       }
 
       if (!user || !user.id) {
         throw new Error('Failed to create or update user');
       }
 
-      // Now send OTP
-      return await this.requestOTP(phoneNumber, role);
-    } catch (error) {
+      // Verify username was saved
+      const verifyUser = await User.findById(user.id);
+      if (!verifyUser || (verifyUser as any).username !== username) {
+        console.error('[AuthService.setUsername] Username not saved correctly:', {
+          expected: username,
+          actual: (verifyUser as any)?.username
+        });
+        return { success: false, message: "Username was not saved. Please try again." };
+      }
+
+      // Return success (don't send OTP - that's confusing)
+      return { 
+        success: true, 
+        message: "Username set successfully",
+        user: {
+          id: user.id,
+          username: (user as any).username,
+          phoneNumber: user.phoneNumber
+        }
+      };
+    } catch (error: any) {
       console.error('Error setting username:', error);
-      return { success: false, message: "Failed to set username" };
+      return { success: false, message: error.message || "Failed to set username" };
     }
   }
 

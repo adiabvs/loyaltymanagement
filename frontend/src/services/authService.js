@@ -72,6 +72,16 @@ export const authService = {
     return apiClient.get("/auth/me");
   },
 
+  async checkUsername(role) {
+    const endpoint = role === "brand" ? "/brand/username/check" : "/customer/username/check";
+    return apiClient.get(endpoint);
+  },
+
+  async updateUsername(username, endpoint) {
+    const response = await apiClient.post(endpoint, { username });
+    return response;
+  },
+
   signOut() {
     apiClient.clearToken();
   },

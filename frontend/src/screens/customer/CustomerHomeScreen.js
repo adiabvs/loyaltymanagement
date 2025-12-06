@@ -4,17 +4,34 @@ import QRCode from "react-native-qrcode-svg";
 import { useAuth } from "../../providers/AuthProvider";
 import { useCustomerLoyalty } from "../../hooks/useCustomerLoyalty";
 import { loyaltyService } from "../../services/loyaltyService";
+import { authService } from "../../services/authService";
+import { UsernameSetupModal } from "../../components/UsernameSetupModal";
 
 export function CustomerHomeScreen() {
   const { user } = useAuth();
   const { qrPayload, refresh } = useCustomerLoyalty(user?.id);
   const [qualifiedOffers, setQualifiedOffers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [usernameChecked, setUsernameChecked] = useState(false);
 
   useEffect(() => {
+    checkUsername();
     refresh();
     loadQualifiedOffers();
   }, []);
+
+  const checkUsername = async () => {
+    try {
+      const response = await authService.checkUsername("customer");
+      if (response.needsSetup && !usernameChecked) {
+        setShowUsernameModal(true);
+        setUsernameChecked(true);
+      }
+    } catch (error) {
+      console.error("Failed to check username:", error);
+    }
+  };
 
   const loadQualifiedOffers = async () => {
     try {
@@ -129,6 +146,13 @@ export function CustomerHomeScreen() {
           </Text>
         </View>
       )}
+
+      <UsernameSetupModal
+        visible={showUsernameModal}
+        onClose={() => setShowUsernameModal(false)}
+        role="customer"
+        phoneNumber={user?.phoneNumber || user?.phone || ""}
+      />
     </ScrollView>
   );
 }

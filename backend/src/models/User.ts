@@ -54,8 +54,21 @@ export class User {
     return users[0] || null;
   }
 
+  /**
+   * Extracts username from phone number by taking the last 10 digits.
+   * This is used for brand-customer mapping - customers see campaigns from
+   * brands that share the same last 10 digits of their phone number.
+   * 
+   * Examples:
+   * - "+1-555-123-4567" → "5551234567"
+   * - "15551234567" → "5551234567"
+   * - "(555) 123-4567" → "5551234567"
+   * 
+   * @param phoneNumber - Phone number in any format
+   * @returns Last 10 digits as string
+   */
   static extractUsername(phoneNumber: string): string {
-    // Extract last 10 digits as username
+    // Remove all non-digit characters, then take last 10 digits
     const digits = phoneNumber.replace(/\D/g, '');
     return digits.slice(-10);
   }
