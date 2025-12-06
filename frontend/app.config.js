@@ -63,8 +63,16 @@ export default {
         {
           android: {
             kotlinVersion: "2.0.21",
+            compileSdkVersion: 35,
+            targetSdkVersion: 35,
+            minSdkVersion: 23,
+            buildToolsVersion: "35.0.0",
             gradleProperties: {
-              "kotlin.version": "2.0.21"
+              "kotlin.version": "2.0.21",
+              "org.gradle.jvmargs": "-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8",
+              "kotlin.code.style": "official",
+              "kotlin.incremental": "true",
+              "kotlin.parallel.tasks.in.project": "true"
             }
           }
         }

@@ -35,6 +35,132 @@ if errorlevel 1 (
 
 echo.
 echo Step 3: Checking Android build setup...
+
+REM Check Java installation and JAVA_HOME
+echo Checking Java installation...
+java -version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Java is not installed or not in PATH!
+    echo Please install Java JDK 17 or higher and add it to your PATH.
+    echo.
+    pause
+    exit /b 1
+)
+
+REM Display Java version
+echo Java version:
+java -version 2>&1 | findstr /i "version" >nul
+if errorlevel 1 (
+    java -version
+)
+
+REM Check and set JAVA_HOME if needed
+if "%JAVA_HOME%"=="" (
+    echo.
+    echo WARNING: JAVA_HOME is not set. Attempting to find Java JDK...
+    
+    REM Try common JDK installation locations
+    set FOUND_JDK=
+    
+    REM Check Program Files\Java
+    if exist "C:\Program Files\Java" (
+        for /d %%i in ("C:\Program Files\Java\jdk*") do (
+            if exist "%%i\bin\java.exe" (
+                set FOUND_JDK=%%i
+                goto found_jdk
+            )
+        )
+    )
+    
+    REM Check Program Files (x86)\Java
+    if exist "C:\Program Files (x86)\Java" (
+        for /d %%i in ("C:\Program Files (x86)\Java\jdk*") do (
+            if exist "%%i\bin\java.exe" (
+                set FOUND_JDK=%%i
+                goto found_jdk
+            )
+        )
+    )
+    
+    REM Check Eclipse Adoptium
+    if exist "C:\Program Files\Eclipse Adoptium" (
+        for /d %%i in ("C:\Program Files\Eclipse Adoptium\jdk*") do (
+            if exist "%%i\bin\java.exe" (
+                set FOUND_JDK=%%i
+                goto found_jdk
+            )
+        )
+    )
+    
+    REM Check Microsoft OpenJDK
+    if exist "C:\Program Files\Microsoft" (
+        for /d %%i in ("C:\Program Files\Microsoft\jdk*") do (
+            if exist "%%i\bin\java.exe" (
+                set FOUND_JDK=%%i
+                goto found_jdk
+            )
+        )
+    )
+    
+    found_jdk:
+    if defined FOUND_JDK (
+        set JAVA_HOME=!FOUND_JDK!
+        echo Found JDK at: !JAVA_HOME!
+    ) else (
+        echo.
+        echo ERROR: Could not find Java JDK installation automatically.
+        echo.
+        echo Please enter the path to your JDK installation:
+        echo (Example: C:\Program Files\Java\jdk-17)
+        echo.
+        set /p MANUAL_JDK_PATH=Enter JDK path: 
+        
+        if defined MANUAL_JDK_PATH (
+            REM Remove quotes if present
+            set MANUAL_JDK_PATH=!MANUAL_JDK_PATH:"=!
+            REM Remove trailing backslash
+            if "!MANUAL_JDK_PATH:~-1!"=="\" set MANUAL_JDK_PATH=!MANUAL_JDK_PATH:~0,-1!
+            
+            if exist "!MANUAL_JDK_PATH!\bin\java.exe" (
+                set JAVA_HOME=!MANUAL_JDK_PATH!
+                echo Using JDK at: !JAVA_HOME!
+            ) else (
+                echo ERROR: Invalid JDK path. java.exe not found at: !MANUAL_JDK_PATH!\bin\java.exe
+                echo.
+                echo Common JDK locations to check:
+                echo   - C:\Program Files\Java\jdk-17
+                echo   - C:\Program Files\Java\jdk-21
+                echo   - C:\Program Files\Eclipse Adoptium\jdk-17
+                echo   - C:\Program Files\Microsoft\jdk-17
+                echo.
+                pause
+                exit /b 1
+            )
+        ) else (
+            echo No path entered. Exiting.
+            pause
+            exit /b 1
+        )
+    )
+) else (
+    echo JAVA_HOME is set to: %JAVA_HOME%
+)
+
+REM Verify JAVA_HOME points to valid Java
+if exist "%JAVA_HOME%\bin\java.exe" (
+    echo Java found at: %JAVA_HOME%\bin\java.exe
+) else (
+    echo ERROR: JAVA_HOME does not point to a valid Java installation!
+    echo Current JAVA_HOME: %JAVA_HOME%
+    echo Please set JAVA_HOME to your JDK installation directory.
+    pause
+    exit /b 1
+)
+
+REM Ensure JAVA_HOME doesn't have trailing backslash
+set "JAVA_HOME=%JAVA_HOME:"=%"
+if "%JAVA_HOME:~-1%"=="\" set "JAVA_HOME=%JAVA_HOME:~0,-1%"
+
 cd android
 
 REM Check if gradlew.bat exists
@@ -73,9 +199,35 @@ echo.
 echo Step 4: Building production APK...
 
 REM Build release APK
+echo.
 echo Building APK with Gradle...
 echo This may take several minutes...
-call gradlew.bat assembleRelease --stacktrace
+echo.
+echo Using JAVA_HOME: %JAVA_HOME%
+echo.
+
+REM Clean build first to avoid cached issues
+echo Cleaning previous build...
+call gradlew.bat clean
+if errorlevel 1 (
+    echo WARNING: Clean failed, but continuing with build...
+)
+
+REM Clean Gradle cache for problematic modules
+echo Cleaning Gradle cache...
+call gradlew.bat cleanBuildCache
+if errorlevel 1 (
+    echo WARNING: Clean cache failed, but continuing...
+)
+
+REM Build release APK
+echo Starting release build...
+echo.
+REM Ensure CLASSPATH is not set (can cause issues with Gradle)
+set CLASSPATH=
+REM Increase memory for Kotlin compilation
+set GRADLE_OPTS=-Xmx4096m -XX:MaxMetaspaceSize=1024m
+call gradlew.bat assembleRelease --stacktrace --no-daemon
 set BUILD_EXIT_CODE=%ERRORLEVEL%
 
 if %BUILD_EXIT_CODE% neq 0 (

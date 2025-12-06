@@ -256,3 +256,4 @@ adb install android/app/build/outputs/apk/release/app-release.apk
 4. Monitor app performance and errors
 
 
+
