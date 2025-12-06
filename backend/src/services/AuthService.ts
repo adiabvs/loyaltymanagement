@@ -37,19 +37,19 @@ export class AuthService {
   private static readonly JWT_EXPIRES_IN = "7d";
   // OTP expiry is handled in the User model
 
-  static generateToken(phoneOrEmail: string, role: UserRole): string {
+  static generateToken(phoneOrEmail: string, role: UserRole, username?: string): string {
     return jwt.sign(
-      { phoneOrEmail, role },
+      { phoneOrEmail, role, username },
       this.JWT_SECRET,
       { expiresIn: this.JWT_EXPIRES_IN }
     );
   }
 
-  static verifyToken(token: string): { phoneOrEmail: string; role: UserRole } {
-    return jwt.verify(token, this.JWT_SECRET) as { phoneOrEmail: string; role: UserRole };
+  static verifyToken(token: string): { phoneOrEmail: string; role: UserRole; username?: string } {
+    return jwt.verify(token, this.JWT_SECRET) as { phoneOrEmail: string; role: UserRole; username?: string };
   }
 
-  static async requestOTP(phoneNumber: string, role?: UserRole): Promise<{ success: boolean; message: string }> {
+  static async requestOTP(phoneNumber: string, role?: UserRole): Promise<{ success: boolean; message: string; needsUsername?: boolean }> {
     try {
       // Generate random 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -81,6 +81,15 @@ export class AuthService {
         throw new Error('Failed to create or find user');
       }
 
+      // Check if username is needed
+      if (!user.username) {
+        return { 
+          success: true, 
+          message: "Username required", 
+          needsUsername: true 
+        };
+      }
+
       // Set OTP and expiry
       await User.setOtp(user.id, otp);
 
@@ -110,6 +119,49 @@ export class AuthService {
     } catch (error) {
       console.error('Error sending OTP:', error);
       throw new Error('Failed to send OTP');
+    }
+  }
+
+  static async setUsername(phoneNumber: string, username: string, role?: UserRole): Promise<{ success: boolean; message: string }> {
+    try {
+      // Validate username: 3-20 characters, alphanumeric and underscore only
+      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+      if (!usernameRegex.test(username)) {
+        return { success: false, message: "Username must be 3-20 characters, alphanumeric and underscore only" };
+      }
+
+      // Check if username already exists
+      const existingUser = await User.findByUsername(username);
+      if (existingUser && existingUser.phoneNumber !== phoneNumber) {
+        return { success: false, message: "Username already taken" };
+      }
+
+      // Find user by phone
+      let user = await User.findByPhone(phoneNumber);
+      if (!user || !user.id) {
+        // Create new user if doesn't exist
+        const userRole = (role as UserRole) || USER_ROLE.CUSTOMER;
+        const userId = await User.create({
+          phoneNumber,
+          username,
+          role: userRole,
+        });
+        user = await User.findById(userId);
+      } else {
+        // Update existing user with username
+        await User.updateUser(user.id, { username });
+        user = await User.findById(user.id);
+      }
+
+      if (!user || !user.id) {
+        throw new Error('Failed to create or update user');
+      }
+
+      // Now send OTP
+      return await this.requestOTP(phoneNumber, role);
+    } catch (error) {
+      console.error('Error setting username:', error);
+      return { success: false, message: "Failed to set username" };
     }
   }
 
@@ -176,7 +228,7 @@ export class AuthService {
       console.log('[AuthService] OTP verified successfully');
 
       // Generate JWT token
-      const token = this.generateToken(phoneNumber, user.role);
+      const token = this.generateToken(phoneNumber, user.role, user.username);
 
       return { 
         success: true, 
@@ -184,6 +236,7 @@ export class AuthService {
         user: {
           id: user.id,
           phoneNumber: user.phoneNumber,
+          username: user.username,
           role: user.role,
           name: user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : undefined,
           businessName: user.businessName

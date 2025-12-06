@@ -24,6 +24,7 @@ const signUpSchema = z.object({
 
 router.post("/signin", validate(signInSchema), AuthController.signIn);
 router.post("/signup", validate(signUpSchema), AuthController.signUp);
+router.post("/set-username", AuthController.setUsername);
 router.get("/me", authenticate, AuthController.me);
 
 export default router;

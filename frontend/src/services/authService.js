@@ -10,6 +10,16 @@ export const authService = {
     return response;
   },
 
+  // Set username for user
+  async setUsername(phoneNumber, username, role) {
+    const response = await apiClient.post("/auth/set-username", {
+      phoneNumber,
+      username,
+      role,
+    });
+    return response;
+  },
+
   // Verify OTP and sign in
   async verifyOTP(phoneNumber, otp, role) {
     const response = await apiClient.post("/otp/verify", {

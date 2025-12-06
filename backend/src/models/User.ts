@@ -4,6 +4,7 @@ import { UserRole } from '../types';
 export interface IUser {
   id?: string;
   phoneNumber: string;
+  username?: string;
   email?: string;
   role: UserRole;
   firstName?: string;
@@ -23,6 +24,8 @@ export class User {
     const now = new Date();
     const user = {
       ...userData,
+      // If username not provided, extract from phone number (last 10 digits)
+      username: userData.username || this.extractUsername(userData.phoneNumber),
       isVerified: false,
       createdAt: now,
       updatedAt: now,
@@ -41,6 +44,20 @@ export class User {
     ], 1);
     
     return users[0] || null;
+  }
+
+  static async findByUsername(username: string): Promise<IUser | null> {
+    const users = await database.query<IUser>(this.collection, [
+      ['username', '==', username]
+    ], 1);
+    
+    return users[0] || null;
+  }
+
+  static extractUsername(phoneNumber: string): string {
+    // Extract last 10 digits as username
+    const digits = phoneNumber.replace(/\D/g, '');
+    return digits.slice(-10);
   }
 
   static async updateUser(id: string, updates: Partial<IUser>): Promise<void> {

@@ -19,6 +19,12 @@ const signUpSchema = z.object({
   role: z.enum(["customer", "brand"]).default("customer"),
 });
 
+const setUsernameSchema = z.object({
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/, "Username must be alphanumeric and underscore only"),
+  role: z.enum(["customer", "brand"]).optional(),
+});
+
 export class AuthController {
   static async requestOtp(req: Request, res: Response): Promise<void> {
     try {
@@ -124,6 +130,25 @@ export class AuthController {
     }
   }
 
+  static async setUsername(req: Request, res: Response): Promise<void> {
+    try {
+      const { phoneNumber, username, role } = setUsernameSchema.parse(req.body);
+      const result = await AuthService.setUsername(phoneNumber, username, role);
+      
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error in setUsername:", error);
+      res.status(400).json({ 
+        success: false, 
+        message: error.message || "Failed to set username" 
+      });
+    }
+  }
+
   static async me(req: any, res: Response): Promise<void> {
     try {
       // Get user by phone number from JWT token (phoneOrEmail field)
@@ -141,6 +166,7 @@ export class AuthController {
         user: {
           id: user.id,
           phoneNumber: user.phoneNumber,
+          username: user.username,
           email: user.email,
           role: user.role,
           name: user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : undefined,

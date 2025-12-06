@@ -29,6 +29,7 @@
         "buildType": "apk"
       },
       "env": {
+        "NODE_ENV": "production",
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://loyaltymanagement.onrender.com/api"
       }

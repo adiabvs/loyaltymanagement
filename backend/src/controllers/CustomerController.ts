@@ -19,16 +19,17 @@ export class CustomerController {
       // Get unredeemed rewards
       const rewards = await db.rewards.getUnredeemed(customerId);
 
+      // Get customer user record to check for custom stampsToReward and username
+      const customer = await db.users.findById(customerId);
+      const stampsToReward = (customer as any)?.stampsToReward || 5; // Default to 5 if not set
+
       // Generate QR payload
       const qrPayload = JSON.stringify({
         type: "visit",
         customerId,
+        username: customer?.username,
         issuedAt: Date.now(),
       });
-
-      // Get customer user record to check for custom stampsToReward
-      const customer = await db.users.findById(customerId);
-      const stampsToReward = (customer as any)?.stampsToReward || 5; // Default to 5 if not set
 
       res.json({
         visits: visitCount,
@@ -47,9 +48,13 @@ export class CustomerController {
   static async getQRCode(req: AuthRequest, res: Response): Promise<void> {
     try {
       const customerId = req.userId!;
+      const db = getDatabase();
+      const customer = await db.users.findById(customerId);
+      
       const qrPayload = JSON.stringify({
         type: "visit",
         customerId,
+        username: customer?.username,
         issuedAt: Date.now(),
       });
       res.json({ qrPayload });

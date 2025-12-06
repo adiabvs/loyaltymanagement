@@ -74,29 +74,23 @@ export class BrandController {
       let customerId: string | null = null;
       let customer = null;
 
-      // Support both QR code and phone number lookup
+      // Support both QR code and phone number/username lookup
       if (phoneNumber) {
-        // Lookup by phone number (last 10 digits)
+        // Extract username from phone number (last 10 digits)
         const phoneDigits = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-        const last10Digits = phoneDigits.slice(-10); // Get last 10 digits
+        const username = phoneDigits.slice(-10); // Get last 10 digits as username
         
-        // Try to find customer by phone number (exact match or ending match)
-        // First try exact match
-        customer = await db.users.findByEmailOrPhone(last10Digits);
+        // Try to find customer by username first (primary method)
+        const { User } = await import('../models/User');
+        customer = await User.findByUsername(username);
         
-        // If not found, try finding by partial match (phone ending with these digits)
+        // If not found by username, try by phone number (fallback)
         if (!customer) {
-          // Use database query helper to find customers
-          const { database } = await import('../database/index');
-          const allUsers = await database.query('users', [['role', '==', 'customer']], 1000);
-          customer = allUsers.find((u: any) => {
-            const userPhone = u.phoneNumber?.replace(/\D/g, '') || '';
-            return userPhone.endsWith(last10Digits) || userPhone === last10Digits;
-          }) || null;
+          customer = await db.users.findByEmailOrPhone(phoneNumber);
         }
         
         if (!customer || !customer.id) {
-          res.status(404).json({ error: "Customer not found with this phone number" });
+          res.status(404).json({ error: "Customer not found. Please ensure the customer has a username set." });
           return;
         }
         customerId = customer.id;
@@ -117,12 +111,22 @@ export class BrandController {
             return;
           }
 
-          customerId = payload.customerId;
-          customer = await db.users.findById(customerId);
-          if (!customer) {
+          // Try to find customer by customerId first (from QR)
+          if (payload.customerId) {
+            customer = await db.users.findById(payload.customerId);
+          }
+          
+          // If not found and username is in QR, try by username
+          if (!customer && payload.username) {
+            const { User } = await import('../models/User');
+            customer = await User.findByUsername(payload.username);
+          }
+          
+          if (!customer || !customer.id) {
             res.status(404).json({ error: "Customer not found" });
             return;
           }
+          customerId = customer.id;
         } catch (parseError) {
           res.status(400).json({ error: "Invalid QR code format" });
           return;

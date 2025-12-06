@@ -5,23 +5,41 @@ import { authService } from "../../services/authService";
 
 export function AuthScreen() {
   const { setUserFromOTP } = useAuth();
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneDigits, setPhoneDigits] = useState("");
+  const [username, setUsername] = useState("");
   const [otp, setOtp] = useState("");
   const [role, setRole] = useState("customer");
   const [otpSent, setOtpSent] = useState(false);
+  const [needsUsername, setNeedsUsername] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const COUNTRY_CODE = "+91";
+  const fullPhoneNumber = `${COUNTRY_CODE}${phoneDigits}`;
+
+  const validateUsername = (username) => {
+    // Username should be meaningful, no special characters, only alphanumeric and underscore
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    return usernameRegex.test(username);
+  };
 
   const handleRequestOTP = async () => {
-    if (!phoneNumber.trim()) {
-      Alert.alert("Error", "Please enter your phone number");
+    if (!phoneDigits.trim() || phoneDigits.length !== 10) {
+      Alert.alert("Error", "Please enter a valid 10-digit phone number");
       return;
     }
+    
     setLoading(true);
     try {
-      const response = await authService.requestOTP(phoneNumber, role);
+      const response = await authService.requestOTP(fullPhoneNumber, role);
       if (response.success) {
-        setOtpSent(true);
-        Alert.alert("Success", "OTP sent to your phone number");
+        // Check if username is needed
+        if (response.needsUsername) {
+          setNeedsUsername(true);
+          Alert.alert("Username Required", "Please enter a username to continue");
+        } else {
+          setOtpSent(true);
+          Alert.alert("Success", "OTP sent to your phone number");
+        }
       } else {
         Alert.alert("Error", response.message || "Failed to send OTP");
       }
@@ -36,6 +54,35 @@ export function AuthScreen() {
     }
   };
 
+  const handleSetUsername = async () => {
+    if (!username.trim()) {
+      Alert.alert("Error", "Please enter a username");
+      return;
+    }
+    
+    if (!validateUsername(username)) {
+      Alert.alert("Error", "Username must be 3-20 characters, alphanumeric and underscore only");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await authService.setUsername(fullPhoneNumber, username, role);
+      if (response.success) {
+        setNeedsUsername(false);
+        setOtpSent(true);
+        Alert.alert("Success", "Username set. OTP sent to your phone number");
+      } else {
+        Alert.alert("Error", response.message || "Failed to set username");
+      }
+    } catch (error) {
+      console.error("Set username error:", error);
+      Alert.alert("Error", error.message || "Failed to set username");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerifyOTP = async () => {
     if (!otp.trim() || otp.length !== 6) {
       Alert.alert("Error", "Please enter a valid 6-digit OTP");
@@ -43,7 +90,7 @@ export function AuthScreen() {
     }
     setLoading(true);
     try {
-      const response = await authService.verifyOTP(phoneNumber, otp, role);
+      const response = await authService.verifyOTP(fullPhoneNumber, otp, role);
       if (response.success && response.token && response.user) {
         // User is authenticated, set user in context
         setUserFromOTP(response.user);
@@ -66,17 +113,48 @@ export function AuthScreen() {
       <Text style={styles.title}>Loyalty Pilot</Text>
       <Text style={styles.subtitle}>Sign in to continue</Text>
 
-      <TextInput
-        placeholder="Phone Number"
-        placeholderTextColor="#888"
-        style={styles.input}
-        value={phoneNumber}
-        onChangeText={setPhoneNumber}
-        keyboardType="phone-pad"
-        editable={!otpSent}
-      />
+      <View style={styles.phoneContainer}>
+        <View style={styles.countryCodeContainer}>
+          <Text style={styles.countryCode}>+91</Text>
+        </View>
+        <TextInput
+          placeholder="Enter 10-digit number"
+          placeholderTextColor="#888"
+          style={[styles.input, styles.phoneInput]}
+          value={phoneDigits}
+          onChangeText={(text) => {
+            // Only allow digits and limit to 10
+            const digits = text.replace(/\D/g, '').slice(0, 10);
+            setPhoneDigits(digits);
+          }}
+          keyboardType="phone-pad"
+          maxLength={10}
+          editable={!otpSent && !needsUsername}
+        />
+      </View>
+
+      {needsUsername && (
+        <View>
+          <TextInput
+            placeholder="Enter username (3-20 characters, alphanumeric only)"
+            placeholderTextColor="#888"
+            style={styles.input}
+            value={username}
+            onChangeText={(text) => {
+              // Only allow alphanumeric and underscore
+              const cleaned = text.replace(/[^a-zA-Z0-9_]/g, '');
+              setUsername(cleaned);
+            }}
+            autoCapitalize="none"
+            maxLength={20}
+          />
+          <Text style={styles.helperText}>
+            Username must be 3-20 characters, letters, numbers, and underscore only
+          </Text>
+        </View>
+      )}
       
-      {otpSent && (
+      {otpSent && !needsUsername && (
         <TextInput
           placeholder="Enter 6-digit OTP"
           placeholderTextColor="#888"
@@ -125,20 +203,22 @@ export function AuthScreen() {
 
       <TouchableOpacity 
         style={[styles.cta, loading && styles.ctaDisabled]} 
-        onPress={otpSent ? handleVerifyOTP : handleRequestOTP}
+        onPress={needsUsername ? handleSetUsername : (otpSent ? handleVerifyOTP : handleRequestOTP)}
         disabled={loading}
       >
         <Text style={styles.ctaText}>
-          {loading ? "Processing..." : otpSent ? "Verify OTP" : "Request OTP"}
+          {loading ? "Processing..." : needsUsername ? "Set Username" : (otpSent ? "Verify OTP" : "Request OTP")}
         </Text>
       </TouchableOpacity>
       
-      {otpSent && (
+      {(otpSent || needsUsername) && (
         <TouchableOpacity 
           style={styles.secondaryButton}
           onPress={() => {
             setOtpSent(false);
+            setNeedsUsername(false);
             setOtp("");
+            setUsername("");
           }}
         >
           <Text style={styles.secondaryButtonText}>Change Phone Number</Text>
@@ -170,6 +250,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 32,
   },
+  phoneContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
+  countryCodeContainer: {
+    backgroundColor: "#111320",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#23263A",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  countryCode: {
+    color: "#888",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  phoneInput: {
+    flex: 1,
+  },
   input: {
     backgroundColor: "#111320",
     borderRadius: 12,
@@ -179,6 +281,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#23263A",
     marginBottom: 16,
+  },
+  helperText: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   roleSwitch: {
     flexDirection: "row",

@@ -24,7 +24,14 @@ export const authenticate = async (
     const decoded = AuthService.verifyToken(token);
 
     // Get user from database to get the actual user ID
-    const user = await User.findByPhone(decoded.phoneOrEmail);
+    // Try by username first if available, then by phone
+    let user = null;
+    if (decoded.username) {
+      user = await User.findByUsername(decoded.username);
+    }
+    if (!user) {
+      user = await User.findByPhone(decoded.phoneOrEmail);
+    }
     if (!user || !user.id) {
       res.status(401).json({ error: "User not found" });
       return;
