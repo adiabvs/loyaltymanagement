@@ -19,7 +19,7 @@ export class CustomerController {
       // Get unredeemed rewards
       const rewards = await db.rewards.getUnredeemed(customerId);
 
-      // Get customer user record to check for custom stampsToReward and username
+      // Get customer user record to check for custom stampsToReward
       const customer = await db.users.findById(customerId);
       const stampsToReward = (customer as any)?.stampsToReward || 5; // Default to 5 if not set
 
@@ -27,7 +27,6 @@ export class CustomerController {
       const qrPayload = JSON.stringify({
         type: "visit",
         customerId,
-        username: (customer as any)?.username,
         issuedAt: Date.now(),
       });
 
@@ -48,17 +47,10 @@ export class CustomerController {
   static async getQRCode(req: AuthRequest, res: Response): Promise<void> {
     try {
       const customerId = req.userId!;
-      const db = getDatabase();
-      const customer = await db.users.findById(customerId);
-      
-      // Get username (use last 10 digits if not set)
-      const { User } = await import('../models/User');
-      const username = (customer as any)?.username || User.extractUsername((customer as any)?.phoneNumber || '');
       
       const qrPayload = JSON.stringify({
         type: "visit",
         customerId,
-        username,
         issuedAt: Date.now(),
       });
       res.json({ qrPayload });
@@ -68,101 +60,13 @@ export class CustomerController {
     }
   }
 
-  static async checkUsername(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const userId = req.userId!;
-      const db = getDatabase();
-      const user = await db.users.findById(userId);
-      
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-
-      const { User } = await import('../models/User');
-      const phoneNumber = (user as any)?.phoneNumber || (user as any)?.phone || '';
-      const username = (user as any)?.username;
-      const autoUsername = phoneNumber ? User.extractUsername(phoneNumber) : '';
-      const hasExplicitUsername = username && username !== autoUsername;
-      
-      res.json({
-        hasUsername: !!username,
-        hasExplicitUsername,
-        username: username || autoUsername,
-        phoneNumber,
-        needsSetup: !hasExplicitUsername,
-      });
-    } catch (error: any) {
-      console.error("Error in checkUsername:", error);
-      res.status(500).json({ error: error.message || "Failed to check username" });
-    }
-  }
-
-  /**
-   * Update username for authenticated customer
-   */
-  static async updateUsername(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const userId = req.userId!;
-      const { username } = req.body;
-      const db = getDatabase();
-
-      if (!username) {
-        res.status(400).json({ error: "Username is required" });
-        return;
-      }
-
-      // Validate username
-      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-      if (!usernameRegex.test(username)) {
-        res.status(400).json({ error: "Username must be 3-20 characters, alphanumeric and underscore only" });
-        return;
-      }
-
-      // Check if username is already taken by another user
-      const { User } = await import('../models/User');
-      const existingUser = await User.findByUsername(username);
-      if (existingUser && existingUser.id !== userId) {
-        res.status(400).json({ error: "Username already taken" });
-        return;
-      }
-
-      // Get current user
-      const user = await db.users.findById(userId);
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-
-      // Update username
-      console.log('[updateUsername] Updating username for user:', { userId, username });
-      await db.users.update(userId, { username } as any);
-      
-      // Verify update
-      const updatedUser = await db.users.findById(userId);
-      if (!updatedUser || (updatedUser as any).username !== username) {
-        console.error('[updateUsername] Username not saved correctly');
-        res.status(500).json({ error: "Failed to save username. Please try again." });
-        return;
-      }
-
-      console.log('[updateUsername] Username updated successfully:', { userId, username });
-      res.json({
-        success: true,
-        message: "Username updated successfully",
-        username: (updatedUser as any).username,
-      });
-    } catch (error: any) {
-      console.error("Error in updateUsername:", error);
-      res.status(500).json({ error: error.message || "Failed to update username" });
-    }
-  }
 
   static async getRewards(req: AuthRequest, res: Response): Promise<void> {
     try {
       const customerId = req.userId!;
       const db = getDatabase();
       const rewards = await db.rewards.getByCustomer(customerId);
+      console.log(`[getRewards] Customer ${customerId} has ${rewards.length} rewards:`, rewards.map(r => ({ id: r.id, title: r.title, campaignId: r.campaignId, isRedeemed: r.isRedeemed })));
       res.json({ rewards });
     } catch (error: any) {
       console.error("Error in getRewards:", error);
@@ -207,31 +111,26 @@ export class CustomerController {
         return;
       }
 
-      // BRAND-CUSTOMER MAPPING: Uses last 10 digits of phone number
+      // BRAND-CUSTOMER MAPPING: ALWAYS uses last 10 digits of phone number
       // 
-      // How it works:
-      // 1. Extract customer's username (explicit username OR last 10 digits of phone)
-      // 2. Find brands with matching username (last 10 digits match = same phone pattern)
-      // 3. Show campaigns from all matched brands
+      // Primary method: Match brands by last 10 digits of phone number
+      // This is the main way customers are associated with brands
       //
-      // Example: Customer phone "+1-555-123-4567" → username "5551234567"
-      //          Brand phone "+1-555-123-4567" → username "5551234567"
+      // Example: Customer phone "+1-555-123-4567" → last 10 digits "5551234567"
+      //          Brand phone "+1-555-123-4567" → last 10 digits "5551234567"
       //          Result: Customer sees all campaigns from this brand
       
       const { User } = await import('../models/User');
       // Try multiple possible phone number fields
       const customerPhone = (customer as any).phoneNumber || (customer as any).phone || (customer as any).phoneOrEmail || '';
-      // Get username - check if explicitly set, otherwise extract last 10 digits from phone
-      let customerUsername = (customer as any).username;
-      if (!customerUsername && customerPhone) {
-        customerUsername = User.extractUsername(customerPhone); // Extracts last 10 digits
-      }
+      
+      // ALWAYS extract last 10 digits from customer phone number
+      const customerPhoneLast10 = customerPhone ? User.extractUsername(customerPhone) : '';
       
       console.log('[getPromotions] Customer info:', {
         customerId,
         phone: customerPhone,
-        username: customerUsername,
-        hasExplicitUsername: !!(customer as any).username
+        phoneLast10: customerPhoneLast10,
       });
 
       // Get all brands the customer has visited (associated brands)
@@ -244,109 +143,50 @@ export class CustomerController {
       });
       console.log('[getPromotions] Visited brand IDs:', Array.from(visitedBrandIds));
 
-      // Also find brands by username matching (last 10 digits or explicit username)
-      // This allows customers to see campaigns from brands with matching phone numbers
+      // PRIMARY METHOD: Find brands by matching last 10 digits of phone number
       const associatedBrandIds = new Set<string>(visitedBrandIds);
       
-      // Find all brands with matching username (last 10 digits of phone number)
-      if (customerUsername) {
-        try {
-          // Use Firebase directly to query brands by username
-          const { getFirebaseFirestore } = await import('../config/firebase');
-          const firestore = getFirebaseFirestore();
-          
-          // Try querying with both username and role
-          let brandsQuery;
-          try {
-            brandsQuery = await firestore
-              .collection('users')
-              .where('username', '==', customerUsername)
-              .where('role', '==', 'brand')
-              .get();
-          } catch (queryError: any) {
-            // If composite index error, try separate queries
-            if (queryError.message?.includes('index') || queryError.code === 'failed-precondition') {
-              console.log('[getPromotions] Composite index missing, trying separate queries');
-              const allBrandsQuery = await firestore
-                .collection('users')
-                .where('role', '==', 'brand')
-                .get();
-              
-              brandsQuery = {
-                docs: allBrandsQuery.docs.filter(doc => {
-                  const data = doc.data();
-                  const brandUsername = data.username || User.extractUsername(data.phoneNumber || data.phone || '');
-                  return brandUsername === customerUsername;
-                }),
-                forEach: function(callback: any) {
-                  this.docs.forEach(callback);
-                }
-              } as any;
-            } else {
-              throw queryError;
-            }
-          }
-          
-          const usernameMatchedBrands: string[] = [];
-          brandsQuery.forEach((doc: any) => {
-            const brandData = doc.data();
-            if (doc.id && brandData) {
-              associatedBrandIds.add(doc.id);
-              usernameMatchedBrands.push(doc.id);
-            }
-          });
-          console.log('[getPromotions] Username-matched brand IDs:', usernameMatchedBrands);
-        } catch (error) {
-          console.error('[getPromotions] Error finding brands by username:', error);
-          // Fallback: try finding single brand by username
-          try {
-            const brandByUsername = await User.findByUsername(customerUsername);
-            if (brandByUsername && brandByUsername.id && (brandByUsername as any).role === 'brand') {
-              associatedBrandIds.add(brandByUsername.id);
-              console.log('[getPromotions] Fallback found brand:', brandByUsername.id);
-            }
-          } catch (fallbackError) {
-            console.error('[getPromotions] Fallback username lookup also failed:', fallbackError);
-          }
-        }
-      } else {
-        console.warn('[getPromotions] No customer username available for matching');
-      }
-      
-      // Also try matching by phone number (in case username extraction differs)
-      if (customerPhone) {
+      if (customerPhoneLast10) {
         try {
           const { getFirebaseFirestore } = await import('../config/firebase');
           const firestore = getFirebaseFirestore();
-          const phoneMatchedBrands = await firestore
+          
+          // Get all brands and match by last 10 digits of phone number
+          const allBrands = await firestore
             .collection('users')
             .where('role', '==', 'brand')
             .get();
           
-          const customerPhoneDigits = customerPhone.replace(/\D/g, '').slice(-10);
-          phoneMatchedBrands.forEach((doc: any) => {
+          const phoneMatchedBrands: string[] = [];
+          allBrands.forEach((doc: any) => {
             const brandData = doc.data();
             const brandPhone = brandData.phoneNumber || brandData.phone || '';
-            // If phone numbers match (or last 10 digits match), associate the brand
+            
             if (brandPhone) {
-              const brandPhoneDigits = brandPhone.replace(/\D/g, '').slice(-10);
-              if (customerPhoneDigits === brandPhoneDigits && doc.id) {
+              // Extract last 10 digits from brand phone
+              const brandPhoneLast10 = User.extractUsername(brandPhone);
+              
+              // Match by last 10 digits
+              if (brandPhoneLast10 === customerPhoneLast10 && doc.id) {
                 associatedBrandIds.add(doc.id);
-                console.log('[getPromotions] Phone-matched brand:', doc.id, 'phone:', brandPhoneDigits);
+                phoneMatchedBrands.push(doc.id);
+                console.log('[getPromotions] Phone-matched brand:', doc.id, {
+                  customerPhoneLast10,
+                  brandPhoneLast10,
+                  brandPhone
+                });
               }
             }
           });
+          console.log('[getPromotions] Phone-matched brand IDs (last 10 digits):', phoneMatchedBrands);
         } catch (error) {
-          console.error('[getPromotions] Error matching by phone:', error);
+          console.error('[getPromotions] Error matching brands by phone (last 10 digits):', error);
         }
+      } else {
+        console.warn('[getPromotions] No customer phone number available for matching');
       }
       
-      // MANUAL ASSOCIATION: Find brands by explicit phone number lookup
-      // This allows customers to see campaigns from specific brands even if phone numbers don't match
-      // You can set explicit usernames on both customer and brand to the same value for manual association
-      // Or use the associateBrand endpoint to manually link them
-      
-      // Check if customer has manually associated brand IDs stored
+      // Also include manually associated brands (for cases where phone numbers don't match)
       try {
         const { getFirebaseFirestore } = await import('../config/firebase');
         const firestore = getFirebaseFirestore();
@@ -369,7 +209,7 @@ export class CustomerController {
       
       console.log('[getPromotions] Total associated brand IDs:', Array.from(associatedBrandIds));
 
-      // Get active campaigns from all associated brands (visited + username-matched)
+      // Get active campaigns from all associated brands (visited + phone-matched + manual)
       const allActiveCampaigns = await db.campaigns.getActive();
       console.log('[getPromotions] Total active campaigns:', allActiveCampaigns.length);
       
@@ -421,7 +261,7 @@ export class CustomerController {
               const rewardExists = existingRewards.some(r => 
                 r.brandId === campaign.brandId && 
                 !r.isRedeemed &&
-                (r.title === campaign.title || (r as any).campaignId === campaign.id)
+                (r.campaignId === campaign.id || (r.title === campaign.title && r.brandId === campaign.brandId))
               );
               
               if (!rewardExists) {
@@ -441,6 +281,7 @@ export class CustomerController {
                   await db.rewards.create({
                     customerId,
                     brandId: campaign.brandId,
+                    campaignId: campaign.id,
                     title: rewardTitle,
                     description: rewardDescription,
                     pointsRequired,
@@ -448,11 +289,9 @@ export class CustomerController {
                     isRedeemed: false,
                   });
                   
-                  // Add campaignId to reward if possible (for future reference)
-                  // Note: This might require updating the Reward type to include campaignId
-                  console.log(`Auto-created reward for campaign ${campaign.id} - customer ${customerId}`);
+                  console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (visits: ${visitCount} >= ${campaign.requiredVisits})`);
                 } catch (rewardError: any) {
-                  console.error(`Failed to create reward for campaign ${campaign.id}:`, rewardError);
+                  console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, rewardError);
                   // Continue even if reward creation fails
                 }
               }
@@ -474,7 +313,7 @@ export class CustomerController {
               const rewardExists = existingRewards.some(r => 
                 r.brandId === campaign.brandId && 
                 !r.isRedeemed &&
-                (r.title === campaign.title || (r as any).campaignId === campaign.id)
+                (r.campaignId === campaign.id || (r.title === campaign.title && r.brandId === campaign.brandId))
               );
               
               if (!rewardExists) {
@@ -491,6 +330,7 @@ export class CustomerController {
                   await db.rewards.create({
                     customerId,
                     brandId: campaign.brandId,
+                    campaignId: campaign.id,
                     title: campaign.title,
                     description: campaign.description,
                     pointsRequired,
@@ -498,9 +338,9 @@ export class CustomerController {
                     isRedeemed: false,
                   });
                   
-                  console.log(`Auto-created reward for campaign ${campaign.id} - customer ${customerId}`);
+                  console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (amount: $${totalAmountSpent} >= $${campaign.requiredAmount})`);
                 } catch (rewardError: any) {
-                  console.error(`Failed to create reward for campaign ${campaign.id}:`, rewardError);
+                  console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, rewardError);
                 }
               }
             }
@@ -538,7 +378,7 @@ export class CustomerController {
   }
 
   /**
-   * Find brand by phone number (last 10 digits)
+   * Find brand by phone number (last 10 digits only)
    * Helper endpoint to find brandId from phone number
    */
   static async findBrandByPhone(req: AuthRequest, res: Response): Promise<void> {
@@ -553,9 +393,9 @@ export class CustomerController {
       const { getFirebaseFirestore } = await import('../config/firebase');
       const firestore = getFirebaseFirestore();
       const { User } = await import('../models/User');
-      const brandUsername = User.extractUsername(phoneNumber);
+      const customerPhoneLast10 = User.extractUsername(phoneNumber);
       
-      // Find brand by username (last 10 digits)
+      // Find brands by matching last 10 digits of phone number only
       const brands = await firestore
         .collection('users')
         .where('role', '==', 'brand')
@@ -565,17 +405,20 @@ export class CustomerController {
       brands.docs.forEach((doc: any) => {
         const brandData = doc.data();
         const brandPhone = brandData.phoneNumber || brandData.phone || '';
-        const brandUsernameFromPhone = brandData.username || User.extractUsername(brandPhone);
         
-        if (brandUsernameFromPhone === brandUsername || 
-            User.extractUsername(brandPhone) === brandUsername) {
-          matchingBrands.push({
-            id: doc.id,
-            phoneNumber: brandPhone,
-            username: brandUsernameFromPhone,
-            businessName: brandData.businessName,
-            name: brandData.name || brandData.firstName,
-          });
+        if (brandPhone) {
+          // Extract last 10 digits from brand phone number
+          const brandPhoneLast10 = User.extractUsername(brandPhone);
+          
+          // Match by last 10 digits only (no username checks)
+          if (brandPhoneLast10 === customerPhoneLast10) {
+            matchingBrands.push({
+              id: doc.id,
+              phoneNumber: brandPhone,
+              businessName: brandData.businessName,
+              name: brandData.name || brandData.firstName,
+            });
+          }
         }
       });
 
@@ -608,14 +451,14 @@ export class CustomerController {
 
       let targetBrandId = brandId;
 
-      // If brandPhoneNumber provided, find brand by phone
+      // If brandPhoneNumber provided, find brand by phone (last 10 digits only)
       if (!targetBrandId && brandPhoneNumber) {
         const { getFirebaseFirestore } = await import('../config/firebase');
         const firestore = getFirebaseFirestore();
         const { User } = await import('../models/User');
-        const brandUsername = User.extractUsername(brandPhoneNumber);
+        const providedPhoneLast10 = User.extractUsername(brandPhoneNumber);
         
-        // Find brand by username (last 10 digits)
+        // Find brand by matching last 10 digits of phone number only
         const brands = await firestore
           .collection('users')
           .where('role', '==', 'brand')
@@ -624,12 +467,16 @@ export class CustomerController {
         for (const doc of brands.docs) {
           const brandData = doc.data();
           const brandPhone = brandData.phoneNumber || brandData.phone || '';
-          const brandUsernameFromPhone = brandData.username || User.extractUsername(brandPhone);
           
-          if (brandUsernameFromPhone === brandUsername || 
-              User.extractUsername(brandPhone) === brandUsername) {
-            targetBrandId = doc.id;
-            break;
+          if (brandPhone) {
+            // Extract last 10 digits from brand phone number
+            const brandPhoneLast10 = User.extractUsername(brandPhone);
+            
+            // Match by last 10 digits only (no username checks)
+            if (brandPhoneLast10 === providedPhoneLast10) {
+              targetBrandId = doc.id;
+              break;
+            }
           }
         }
 

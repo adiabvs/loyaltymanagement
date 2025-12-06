@@ -3,33 +3,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-nati
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../providers/AuthProvider";
 import { useBrandDashboard } from "../../hooks/useBrandDashboard";
-import { authService } from "../../services/authService";
-import { UsernameSetupModal } from "../../components/UsernameSetupModal";
 
 export function BrandDashboardScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { metrics, refresh } = useBrandDashboard(user?.id);
   const [loading, setLoading] = useState(true);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [usernameChecked, setUsernameChecked] = useState(false);
 
   useEffect(() => {
-    checkUsername();
     loadData();
   }, []);
-
-  const checkUsername = async () => {
-    try {
-      const response = await authService.checkUsername("brand");
-      if (response.needsSetup && !usernameChecked) {
-        setShowUsernameModal(true);
-        setUsernameChecked(true);
-      }
-    } catch (error) {
-      console.error("Failed to check username:", error);
-    }
-  };
 
   const loadData = async () => {
     setLoading(true);
@@ -122,13 +105,6 @@ export function BrandDashboardScreen() {
           You're currently on the 60-day free pilot. Track your results and see the impact on customer retention.
         </Text>
       </View>
-
-      <UsernameSetupModal
-        visible={showUsernameModal}
-        onClose={() => setShowUsernameModal(false)}
-        role="brand"
-        phoneNumber={user?.phoneNumber || user?.phone || ""}
-      />
     </ScrollView>
   );
 }

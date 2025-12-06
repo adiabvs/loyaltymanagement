@@ -2,7 +2,7 @@
 
 ## Overview
 
-The system uses the **last 10 digits of phone numbers** to automatically associate customers with brands. This allows customers to see campaigns from brands that share the same phone number pattern, even if they haven't visited yet.
+The system **ALWAYS uses the last 10 digits of phone numbers** as the primary method to automatically associate customers with brands. This is the main way customers see campaigns from brands - by matching the last 10 digits of their phone numbers.
 
 ## How It Works
 
@@ -24,10 +24,10 @@ When a customer requests promotions, the system:
    - Uses explicit username if set
    - Otherwise extracts last 10 digits from phone number
 
-2. **Finds associated brands:**
+2. **Finds associated brands (in priority order):**
+   - **PRIMARY:** Brands with matching last 10 digits of phone number
    - Brands the customer has visited (via visits)
-   - Brands with matching username (last 10 digits match)
-   - Brands with matching phone number (last 10 digits match)
+   - Manually associated brands (via API)
 
 3. **Shows campaigns from all associated brands**
 
@@ -65,10 +65,13 @@ static extractUsername(phoneNumber: string): string {
 
 The `getPromotions` endpoint:
 1. Gets customer's phone number
-2. Extracts username (explicit or last 10 digits)
-3. Queries brands with matching username
-4. Also matches by phone number as fallback
-5. Returns campaigns from all matched brands
+2. **ALWAYS extracts last 10 digits** from customer phone number
+3. **PRIMARY METHOD:** Finds all brands and matches by last 10 digits of phone number
+4. Also includes brands from visit history
+5. Also includes manually associated brands
+6. Returns campaigns from all matched brands
+
+**Key Point:** The system ALWAYS uses the last 10 digits of phone numbers as the primary method for brand association.
 
 ### Brand Scanner
 
@@ -86,10 +89,11 @@ When a brand scans a customer's QR or enters phone number:
 
 ## Important Notes
 
+- **ALWAYS Uses Last 10 Digits:** The system ALWAYS uses the last 10 digits of phone numbers as the primary method for brand association
 - **Phone Number Format:** The system handles various formats (with/without country code, dashes, spaces, parentheses)
-- **Username Priority:** Explicit usernames take priority over auto-extracted ones
-- **Case Sensitivity:** Username matching is case-sensitive
 - **10-Digit Requirement:** Phone numbers must have at least 10 digits for extraction to work
+- **Primary Method:** Last 10 digits matching is the PRIMARY way customers see brand campaigns
+- **Additional Methods:** Visit history and manual associations are also included
 
 ## Troubleshooting
 
@@ -99,3 +103,5 @@ If customers aren't seeing brand campaigns:
 2. **Verify last 10 digits match:** Compare the last 10 digits of both phone numbers
 3. **Check explicit usernames:** If explicit usernames are set, they must match exactly
 4. **Review logs:** Check backend logs for `[getPromotions]` messages to see matching process
+
+

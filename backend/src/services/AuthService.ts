@@ -37,19 +37,19 @@ export class AuthService {
   private static readonly JWT_EXPIRES_IN = "7d";
   // OTP expiry is handled in the User model
 
-  static generateToken(phoneOrEmail: string, role: UserRole, username?: string): string {
+  static generateToken(phoneOrEmail: string, role: UserRole): string {
     return jwt.sign(
-      { phoneOrEmail, role, username },
+      { phoneOrEmail, role },
       this.JWT_SECRET,
       { expiresIn: this.JWT_EXPIRES_IN }
     );
   }
 
-  static verifyToken(token: string): { phoneOrEmail: string; role: UserRole; username?: string } {
-    return jwt.verify(token, this.JWT_SECRET) as { phoneOrEmail: string; role: UserRole; username?: string };
+  static verifyToken(token: string): { phoneOrEmail: string; role: UserRole } {
+    return jwt.verify(token, this.JWT_SECRET) as { phoneOrEmail: string; role: UserRole };
   }
 
-  static async requestOTP(phoneNumber: string, role?: UserRole): Promise<{ success: boolean; message: string; needsUsername?: boolean }> {
+  static async requestOTP(phoneNumber: string, role?: UserRole): Promise<{ success: boolean; message: string }> {
     try {
       // Generate random 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -79,15 +79,6 @@ export class AuthService {
 
       if (!user || !user.id) {
         throw new Error('Failed to create or find user');
-      }
-
-      // Check if username is needed
-      if (!user.username) {
-        return { 
-          success: true, 
-          message: "Username required", 
-          needsUsername: true 
-        };
       }
 
       // Set OTP and expiry
@@ -122,69 +113,6 @@ export class AuthService {
     }
   }
 
-  static async setUsername(phoneNumber: string, username: string, role?: UserRole): Promise<{ success: boolean; message: string }> {
-    try {
-      // Validate username: 3-20 characters, alphanumeric and underscore only
-      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-      if (!usernameRegex.test(username)) {
-        return { success: false, message: "Username must be 3-20 characters, alphanumeric and underscore only" };
-      }
-
-      // Check if username already exists (excluding current user)
-      const existingUser = await User.findByUsername(username);
-      if (existingUser && existingUser.phoneNumber !== phoneNumber) {
-        return { success: false, message: "Username already taken" };
-      }
-
-      // Find user by phone
-      let user = await User.findByPhone(phoneNumber);
-      if (!user || !user.id) {
-        // Create new user if doesn't exist
-        const userRole = (role as UserRole) || USER_ROLE.CUSTOMER;
-        const userId = await User.create({
-          phoneNumber,
-          username,
-          role: userRole,
-        });
-        user = await User.findById(userId);
-        console.log('[AuthService.setUsername] Created new user with username:', { userId, username });
-      } else {
-        // Update existing user with username
-        console.log('[AuthService.setUsername] Updating user:', { userId: user.id, username });
-        await User.updateUser(user.id, { username });
-        user = await User.findById(user.id);
-        console.log('[AuthService.setUsername] User updated, verifying:', { userId: user?.id, savedUsername: (user as any)?.username });
-      }
-
-      if (!user || !user.id) {
-        throw new Error('Failed to create or update user');
-      }
-
-      // Verify username was saved
-      const verifyUser = await User.findById(user.id);
-      if (!verifyUser || (verifyUser as any).username !== username) {
-        console.error('[AuthService.setUsername] Username not saved correctly:', {
-          expected: username,
-          actual: (verifyUser as any)?.username
-        });
-        return { success: false, message: "Username was not saved. Please try again." };
-      }
-
-      // Return success (don't send OTP - that's confusing)
-      return { 
-        success: true, 
-        message: "Username set successfully",
-        user: {
-          id: user.id,
-          username: (user as any).username,
-          phoneNumber: user.phoneNumber
-        }
-      };
-    } catch (error: any) {
-      console.error('Error setting username:', error);
-      return { success: false, message: error.message || "Failed to set username" };
-    }
-  }
 
   static async registerUser(phoneNumber: string, role: UserRole, name?: string, businessName?: string): Promise<{ success: boolean; userId?: string; message: string }> {
     try {
@@ -249,7 +177,7 @@ export class AuthService {
       console.log('[AuthService] OTP verified successfully');
 
       // Generate JWT token
-      const token = this.generateToken(phoneNumber, user.role, user.username);
+      const token = this.generateToken(phoneNumber, user.role);
 
       return { 
         success: true, 
@@ -257,7 +185,6 @@ export class AuthService {
         user: {
           id: user.id,
           phoneNumber: user.phoneNumber,
-          username: user.username,
           role: user.role,
           name: user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : undefined,
           businessName: user.businessName

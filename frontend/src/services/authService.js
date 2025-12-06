@@ -10,15 +10,6 @@ export const authService = {
     return response;
   },
 
-  // Set username for user
-  async setUsername(phoneNumber, username, role) {
-    const response = await apiClient.post("/auth/set-username", {
-      phoneNumber,
-      username,
-      role,
-    });
-    return response;
-  },
 
   // Verify OTP and sign in
   async verifyOTP(phoneNumber, otp, role) {
@@ -72,15 +63,6 @@ export const authService = {
     return apiClient.get("/auth/me");
   },
 
-  async checkUsername(role) {
-    const endpoint = role === "brand" ? "/brand/username/check" : "/customer/username/check";
-    return apiClient.get(endpoint);
-  },
-
-  async updateUsername(username, endpoint) {
-    const response = await apiClient.post(endpoint, { username });
-    return response;
-  },
 
   signOut() {
     apiClient.clearToken();

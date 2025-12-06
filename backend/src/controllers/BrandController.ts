@@ -74,23 +74,41 @@ export class BrandController {
       let customerId: string | null = null;
       let customer = null;
 
-      // Support both QR code and phone number/username lookup
+      // Support both QR code and phone number lookup
       if (phoneNumber) {
-        // Extract username from phone number (last 10 digits)
-        const phoneDigits = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-        const username = phoneDigits.slice(-10); // Get last 10 digits as username
-        
-        // Try to find customer by username first (primary method)
+        // Find customer by matching last 10 digits of phone number
+        const { getFirebaseFirestore } = await import('../config/firebase');
+        const firestore = getFirebaseFirestore();
         const { User } = await import('../models/User');
-        customer = await User.findByUsername(username);
+        const providedPhoneLast10 = User.extractUsername(phoneNumber);
         
-        // If not found by username, try by phone number (fallback)
-        if (!customer) {
-          customer = await db.users.findByEmailOrPhone(phoneNumber);
+        // Get all customers and match by last 10 digits of phone number
+        const customers = await firestore
+          .collection('users')
+          .where('role', '==', 'customer')
+          .get();
+        
+        for (const doc of customers.docs) {
+          const customerData = doc.data();
+          const customerPhone = customerData.phoneNumber || customerData.phone || '';
+          
+          if (customerPhone) {
+            // Extract last 10 digits from customer phone number
+            const customerPhoneLast10 = User.extractUsername(customerPhone);
+            
+            // Match by last 10 digits
+            if (customerPhoneLast10 === providedPhoneLast10) {
+              customer = {
+                id: doc.id,
+                ...customerData
+              } as any;
+              break;
+            }
+          }
         }
         
         if (!customer || !customer.id) {
-          res.status(404).json({ error: "Customer not found. Please ensure the customer has a username set." });
+          res.status(404).json({ error: "Customer not found with the provided phone number." });
           return;
         }
         customerId = customer.id;
@@ -111,15 +129,9 @@ export class BrandController {
             return;
           }
 
-          // Try to find customer by customerId first (from QR)
+          // Find customer by customerId from QR
           if (payload.customerId) {
             customer = await db.users.findById(payload.customerId);
-          }
-          
-          // If not found and username is in QR, try by username
-          if (!customer && payload.username) {
-            const { User } = await import('../models/User');
-            customer = await User.findByUsername(payload.username);
           }
           
           if (!customer || !customer.id) {
@@ -171,13 +183,17 @@ export class BrandController {
           const rewardExists = existingRewards.some(r => 
             r.brandId === campaign.brandId && 
             !r.isRedeemed &&
-            (r.title === campaign.title || (r as any).campaignId === campaign.id)
+            (r.campaignId === campaign.id || (r.title === campaign.title && r.brandId === campaign.brandId))
           );
 
-          if (rewardExists) continue;
+          if (rewardExists) {
+            console.log(`Reward already exists for campaign ${campaign.id} - customer ${customerId}`);
+            continue;
+          }
 
           // Check if customer qualifies for visits-based campaign
           if (campaign.qualificationType === "visits" && campaign.requiredVisits) {
+            console.log(`Checking visits campaign ${campaign.id}: customer has ${brandVisitCount} visits, needs ${campaign.requiredVisits}`);
             if (brandVisitCount >= campaign.requiredVisits) {
               let pointsRequired = 0;
               let stampsRequired = 0;
@@ -188,21 +204,27 @@ export class BrandController {
                 stampsRequired = campaign.value;
               }
               
-              await db.rewards.create({
-                customerId,
-                brandId: campaign.brandId,
-                title: campaign.title,
-                description: campaign.description,
-                pointsRequired,
-                stampsRequired,
-                isRedeemed: false,
-              });
-              
-              console.log(`Auto-created reward for campaign ${campaign.id} - customer ${customerId} (visits: ${brandVisitCount} >= ${campaign.requiredVisits})`);
+              try {
+                const reward = await db.rewards.create({
+                  customerId,
+                  brandId: campaign.brandId,
+                  campaignId: campaign.id,
+                  title: campaign.title,
+                  description: campaign.description,
+                  pointsRequired,
+                  stampsRequired,
+                  isRedeemed: false,
+                });
+                
+                console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (visits: ${brandVisitCount} >= ${campaign.requiredVisits})`, reward);
+              } catch (createError: any) {
+                console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, createError);
+              }
             }
           }
           // Check if customer qualifies for money-based campaign
           else if (campaign.qualificationType === "money" && campaign.requiredAmount) {
+            console.log(`Checking money campaign ${campaign.id}: customer spent $${totalAmountSpent}, needs $${campaign.requiredAmount}`);
             if (totalAmountSpent >= campaign.requiredAmount) {
               let pointsRequired = 0;
               let stampsRequired = 0;
@@ -213,17 +235,22 @@ export class BrandController {
                 stampsRequired = campaign.value;
               }
               
-              await db.rewards.create({
-                customerId,
-                brandId: campaign.brandId,
-                title: campaign.title,
-                description: campaign.description,
-                pointsRequired,
-                stampsRequired,
-                isRedeemed: false,
-              });
-              
-              console.log(`Auto-created reward for campaign ${campaign.id} - customer ${customerId} (amount: ${totalAmountSpent} >= ${campaign.requiredAmount})`);
+              try {
+                const reward = await db.rewards.create({
+                  customerId,
+                  brandId: campaign.brandId,
+                  campaignId: campaign.id,
+                  title: campaign.title,
+                  description: campaign.description,
+                  pointsRequired,
+                  stampsRequired,
+                  isRedeemed: false,
+                });
+                
+                console.log(`✅ Auto-created reward for campaign ${campaign.id} - customer ${customerId} (amount: $${totalAmountSpent} >= $${campaign.requiredAmount})`, reward);
+              } catch (createError: any) {
+                console.error(`❌ Failed to create reward for campaign ${campaign.id}:`, createError);
+              }
             }
           }
         }
@@ -413,94 +440,5 @@ export class BrandController {
     }
   }
 
-  static async checkUsername(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const brandId = req.userId!;
-      const db = getDatabase();
-      const brand = await db.users.findById(brandId);
-      
-      if (!brand) {
-        res.status(404).json({ error: "Brand not found" });
-        return;
-      }
-
-      const { User } = await import('../models/User');
-      const phoneNumber = (brand as any)?.phoneNumber || (brand as any)?.phone || '';
-      const username = (brand as any)?.username;
-      const autoUsername = phoneNumber ? User.extractUsername(phoneNumber) : '';
-      const hasExplicitUsername = username && username !== autoUsername;
-      
-      res.json({
-        hasUsername: !!username,
-        hasExplicitUsername,
-        username: username || autoUsername,
-        phoneNumber,
-        needsSetup: !hasExplicitUsername,
-      });
-    } catch (error: any) {
-      console.error("Error in checkUsername:", error);
-      res.status(500).json({ error: error.message || "Failed to check username" });
-    }
-  }
-
-  /**
-   * Update username for authenticated brand
-   */
-  static async updateUsername(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const brandId = req.userId!;
-      const { username } = req.body;
-      const db = getDatabase();
-
-      if (!username) {
-        res.status(400).json({ error: "Username is required" });
-        return;
-      }
-
-      // Validate username
-      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-      if (!usernameRegex.test(username)) {
-        res.status(400).json({ error: "Username must be 3-20 characters, alphanumeric and underscore only" });
-        return;
-      }
-
-      // Check if username is already taken by another user
-      const { User } = await import('../models/User');
-      const existingUser = await User.findByUsername(username);
-      if (existingUser && existingUser.id !== brandId) {
-        res.status(400).json({ error: "Username already taken" });
-        return;
-      }
-
-      // Get current brand
-      const brand = await db.users.findById(brandId);
-      if (!brand) {
-        res.status(404).json({ error: "Brand not found" });
-        return;
-      }
-
-      // Update username
-      console.log('[updateUsername] Updating username for brand:', { brandId, username });
-      await db.users.update(brandId, { username } as any);
-      
-      // Verify update
-      const updatedBrand = await db.users.findById(brandId);
-      if (!updatedBrand || (updatedBrand as any).username !== username) {
-        console.error('[updateUsername] Username not saved correctly');
-        res.status(500).json({ error: "Failed to save username. Please try again." });
-        return;
-      }
-
-      console.log('[updateUsername] Username updated successfully:', { brandId, username });
-      res.json({
-        success: true,
-        message: "Username updated successfully",
-        username: (updatedBrand as any).username,
-      });
-    } catch (error: any) {
-      console.error("Error in updateUsername:", error);
-      res.status(500).json({ error: error.message || "Failed to update username" });
-    }
-  }
 }
 

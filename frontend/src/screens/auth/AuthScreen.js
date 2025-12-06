@@ -6,21 +6,13 @@ import { authService } from "../../services/authService";
 export function AuthScreen() {
   const { setUserFromOTP } = useAuth();
   const [phoneDigits, setPhoneDigits] = useState("");
-  const [username, setUsername] = useState("");
   const [otp, setOtp] = useState("");
   const [role, setRole] = useState("customer");
   const [otpSent, setOtpSent] = useState(false);
-  const [needsUsername, setNeedsUsername] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const COUNTRY_CODE = "+91";
   const fullPhoneNumber = `${COUNTRY_CODE}${phoneDigits}`;
-
-  const validateUsername = (username) => {
-    // Username should be meaningful, no special characters, only alphanumeric and underscore
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-    return usernameRegex.test(username);
-  };
 
   const handleRequestOTP = async () => {
     if (!phoneDigits.trim() || phoneDigits.length !== 10) {
@@ -32,14 +24,8 @@ export function AuthScreen() {
     try {
       const response = await authService.requestOTP(fullPhoneNumber, role);
       if (response.success) {
-        // Check if username is needed
-        if (response.needsUsername) {
-          setNeedsUsername(true);
-          Alert.alert("Username Required", "Please enter a username to continue");
-        } else {
-          setOtpSent(true);
-          Alert.alert("Success", "OTP sent to your phone number");
-        }
+        setOtpSent(true);
+        Alert.alert("Success", "OTP sent to your phone number");
       } else {
         Alert.alert("Error", response.message || "Failed to send OTP");
       }
@@ -49,35 +35,6 @@ export function AuthScreen() {
         "Connection Error", 
         error.message || "Cannot connect to server. Please ensure the backend is running on port 3000."
       );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSetUsername = async () => {
-    if (!username.trim()) {
-      Alert.alert("Error", "Please enter a username");
-      return;
-    }
-    
-    if (!validateUsername(username)) {
-      Alert.alert("Error", "Username must be 3-20 characters, alphanumeric and underscore only");
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await authService.setUsername(fullPhoneNumber, username, role);
-      if (response.success) {
-        setNeedsUsername(false);
-        setOtpSent(true);
-        Alert.alert("Success", "Username set. OTP sent to your phone number");
-      } else {
-        Alert.alert("Error", response.message || "Failed to set username");
-      }
-    } catch (error) {
-      console.error("Set username error:", error);
-      Alert.alert("Error", error.message || "Failed to set username");
     } finally {
       setLoading(false);
     }
@@ -129,32 +86,11 @@ export function AuthScreen() {
           }}
           keyboardType="phone-pad"
           maxLength={10}
-          editable={!otpSent && !needsUsername}
+          editable={!otpSent}
         />
       </View>
-
-      {needsUsername && (
-        <View>
-          <TextInput
-            placeholder="Enter username (3-20 characters, alphanumeric only)"
-            placeholderTextColor="#888"
-            style={styles.input}
-            value={username}
-            onChangeText={(text) => {
-              // Only allow alphanumeric and underscore
-              const cleaned = text.replace(/[^a-zA-Z0-9_]/g, '');
-              setUsername(cleaned);
-            }}
-            autoCapitalize="none"
-            maxLength={20}
-          />
-          <Text style={styles.helperText}>
-            Username must be 3-20 characters, letters, numbers, and underscore only
-          </Text>
-        </View>
-      )}
       
-      {otpSent && !needsUsername && (
+      {otpSent && (
         <TextInput
           placeholder="Enter 6-digit OTP"
           placeholderTextColor="#888"
@@ -203,22 +139,20 @@ export function AuthScreen() {
 
       <TouchableOpacity 
         style={[styles.cta, loading && styles.ctaDisabled]} 
-        onPress={needsUsername ? handleSetUsername : (otpSent ? handleVerifyOTP : handleRequestOTP)}
+        onPress={otpSent ? handleVerifyOTP : handleRequestOTP}
         disabled={loading}
       >
         <Text style={styles.ctaText}>
-          {loading ? "Processing..." : needsUsername ? "Set Username" : (otpSent ? "Verify OTP" : "Request OTP")}
+          {loading ? "Processing..." : (otpSent ? "Verify OTP" : "Request OTP")}
         </Text>
       </TouchableOpacity>
       
-      {(otpSent || needsUsername) && (
+      {otpSent && (
         <TouchableOpacity 
           style={styles.secondaryButton}
           onPress={() => {
             setOtpSent(false);
-            setNeedsUsername(false);
             setOtp("");
-            setUsername("");
           }}
         >
           <Text style={styles.secondaryButtonText}>Change Phone Number</Text>

@@ -13,8 +13,6 @@ router.get("/qr", CustomerController.getQRCode);
 router.get("/rewards", CustomerController.getRewards);
 router.post("/rewards/redeem", CustomerController.redeemReward);
 router.get("/promotions", CustomerController.getPromotions);
-router.get("/username/check", CustomerController.checkUsername);
-router.post("/username/update", CustomerController.updateUsername);
 router.post("/associate-brand", CustomerController.associateBrand);
 router.post("/find-brand-by-phone", CustomerController.findBrandByPhone);
 
